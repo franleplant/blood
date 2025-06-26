@@ -54,7 +54,6 @@ async function main() {
     ORDER BY g.date ASC;
 `;
 
-  console.log("\nExecuting query to fetch HOMA-IR data:", query);
   const results = await db.all(query);
 
   if (results.length === 0) {
