@@ -26,37 +26,35 @@ interface HomaIRDataPoint {
 
 async function main() {
   console.log(`Querying database: ${dbFilePath}`);
-  let db: sqlite.Database | undefined;
-  const homaIRDataPoints: HomaIRDataPoint[] = [];
 
-  try {
-    db = await sqlite.open({
-      filename: dbFilePath,
-      driver: sqlite3Driver.Database,
-    });
-    console.log("Connected to SQLite database.");
+  await using connection = await openDatabase({
+    filename: dbFilePath,
+    driver: sqlite3Driver.Database,
+  });
+  const { db } = connection;
+  console.log("Connected to SQLite database.");
 
-    const distinctInsulinUnitsQuery = `
+  const distinctInsulinUnitsQuery = `
 SELECT DISTINCT unit FROM ${tableName}
 WHERE LOWER(marker_name_en) LIKE '%insulin%'
   AND LOWER(marker_name_en) NOT LIKE '%minutes%'
   AND unit IS NOT NULL AND TRIM(unit) <> '';
 `;
-    console.log("\nFetching distinct insulin units...");
-    const insulinUnitsRows: Array<{ unit: string }> = await db.all(
-      distinctInsulinUnitsQuery
-    );
-    if (insulinUnitsRows.length > 0) {
-      console.log("Found distinct insulin units:");
-      insulinUnitsRows.forEach((row) => console.log(`- '${row.unit}'`));
-    } else {
-      console.log("No distinct insulin units found.");
-    }
-    console.log(
-      "Assuming insulin unit is appropriate for HOMA-IR (e.g., µU/mL).\n---"
-    );
+  console.log("\nFetching distinct insulin units...");
+  const insulinUnitsRows: Array<{ unit: string }> = await db.all(
+    distinctInsulinUnitsQuery
+  );
+  if (insulinUnitsRows.length > 0) {
+    console.log("Found distinct insulin units:");
+    insulinUnitsRows.forEach((row) => console.log(`- '${row.unit}'`));
+  } else {
+    console.log("No distinct insulin units found.");
+  }
+  console.log(
+    "Assuming insulin unit is appropriate for HOMA-IR (e.g., µU/mL).\n---"
+  );
 
-    const query = `
+  const query = `
 SELECT
   g.date,
   g.value AS glucose_value,
@@ -79,150 +77,148 @@ ON g.date = i.date
 ORDER BY g.date ASC;
 `;
 
-    console.log("\nExecuting query to fetch HOMA-IR data:", query);
-    const results: Array<{
-      date: string;
-      glucose_value: string;
-      glucose_unit: string;
-      insulin_value: string;
-      insulin_unit: string;
-    }> = await db.all(query);
+  console.log("\nExecuting query to fetch HOMA-IR data:", query);
+  const results = await db.all(query);
 
-    if (results.length === 0) {
-      console.log("No results found for HOMA-IR data.");
-    } else {
-      console.log(
-        `Found ${results.length} rows. Processing for HOMA-IR and chart data...`
-      );
-      results.forEach((row) => {
-        try {
-          const normalizedGlucose = normalizeGlucose({
-            value: row.glucose_value,
-            unit: row.glucose_unit,
-          });
-          const glucoseValMgDl = parseFloat(normalizedGlucose.value);
-          const insulinValMicroUML = parseFloat(
-            row.insulin_value.replace(",", ".")
-          );
-
-          if (isNaN(glucoseValMgDl) || isNaN(insulinValMicroUML)) {
-            console.warn(
-              `Skipping row (Date: ${row.date}): Invalid number for glucose or insulin.`
-            );
-            return;
-          }
-          const homaIR =
-            (glucoseValMgDl * insulinValMicroUML) / HOMA_IR_DIVISOR;
-          homaIRDataPoints.push({ date: row.date, homaIR });
-          console.log(
-            `Date: ${row.date}, Glucose: ${row.glucose_value} ${
-              row.glucose_unit
-            } -> ${glucoseValMgDl.toFixed(2)} mg/dL, Insulin: ${
-              row.insulin_value
-            } ${row.insulin_unit} -> ${insulinValMicroUML.toFixed(
-              2
-            )} µU/mL, HOMA-IR: ${homaIR.toFixed(2)}`
-          );
-        } catch (error) {
-          console.error(
-            `Error processing row (Date: ${row.date}): ${
-              (error as Error).message
-            }`
-          );
-        }
-      });
-
-      if (homaIRDataPoints.length > 0) {
-        console.log(
-          `\nCollected ${homaIRDataPoints.length} data points for charting.`
-        );
-
-        const chartJSNodeCanvas = new ChartJSNodeCanvas({
-          width: CHART_WIDTH,
-          height: CHART_HEIGHT,
-          backgroundColour: "white",
-          plugins: {
-            globalVariableLegacy: ["chartjs-adapter-moment"],
-          },
-        });
-
-        const configuration = {
-          type: "line" as const,
-          data: {
-            datasets: [
-              {
-                label: "HOMA-IR",
-                data: homaIRDataPoints.map((dp) => ({
-                  x: new Date(dp.date).getTime(),
-                  y: dp.homaIR,
-                })),
-                borderColor: "rgb(75, 192, 192)",
-                tension: 0.1,
-                fill: false,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                position: "top" as const,
-              },
-              title: {
-                display: true,
-                text: "HOMA-IR Over Time",
-              },
-            },
-            scales: {
-              x: {
-                type: "time" as const,
-                time: {
-                  tooltipFormat: "YYYY-MM-DD",
-                },
-                title: {
-                  display: true,
-                  text: "Date",
-                },
-              },
-              y: {
-                title: {
-                  display: true,
-                  text: "HOMA-IR",
-                },
-                beginAtZero: true,
-              },
-            },
-          },
-        };
-
-        console.log("\nGenerating chart image...");
-        const imageBuffer = await chartJSNodeCanvas.renderToBuffer(
-          configuration as any
-        );
-        await fs.writeFile(OUTPUT_CHART_FILE, imageBuffer);
-        console.log(`Chart saved to ${OUTPUT_CHART_FILE}`);
-      } else {
-        console.log("No valid data points to chart after processing.");
-      }
-    }
-  } catch (error) {
-    const err = error as Error;
-    console.error("An error occurred:", err.message, err.stack);
-    process.exit(1);
-  } finally {
-    if (db) {
-      console.log("\nClosing database connection...");
-      try {
-        await db.close();
-        console.log("Database connection closed.");
-      } catch (closeError) {
-        console.error("Error closing database:", (closeError as Error).message);
-      }
-    }
+  if (results.length === 0) {
+    console.log("No results found for HOMA-IR data.");
+    return;
   }
+  console.log(
+    `Found ${results.length} rows. Processing for HOMA-IR and chart data...`
+  );
+
+  const homaIRDataPoints: HomaIRDataPoint[] = results
+    .map((row) => {
+      try {
+        const normalizedGlucose = normalizeGlucose({
+          value: row.glucose_value,
+          unit: row.glucose_unit,
+        });
+        const glucoseValMgDl = parseFloat(normalizedGlucose.value);
+        const insulinValMicroUML = parseFloat(
+          row.insulin_value.replace(",", ".")
+        );
+
+        if (isNaN(glucoseValMgDl) || isNaN(insulinValMicroUML)) {
+          console.warn(
+            `Skipping row (Date: ${row.date}): Invalid number for glucose or insulin.`
+          );
+          return null;
+        }
+        const homaIR =
+          (glucoseValMgDl * insulinValMicroUML) / HOMA_IR_DIVISOR;
+        console.log(
+          `Date: ${row.date}, Glucose: ${row.glucose_value} ${
+            row.glucose_unit
+          } -> ${glucoseValMgDl.toFixed(2)} mg/dL, Insulin: ${
+            row.insulin_value
+          } ${row.insulin_unit} -> ${insulinValMicroUML.toFixed(
+            2
+          )} µU/mL, HOMA-IR: ${homaIR.toFixed(2)}`
+        );
+        return { date: row.date, homaIR };
+      } catch (error) {
+        console.error(
+          `Error processing row (Date: ${row.date}): ${
+            (error as Error).message
+          }`
+        );
+        return null;
+      }
+    })
+    .filter((point): point is HomaIRDataPoint => point !== null);
+
+  if (homaIRDataPoints.length === 0) {
+    console.log("No valid data points to chart after processing.");
+    return;
+  }
+  console.log(
+    `\nCollected ${homaIRDataPoints.length} data points for charting.`
+  );
+
+  await generateChart(homaIRDataPoints);
+}
+
+async function generateChart(homaIRDataPoints: HomaIRDataPoint[]) {
+  const chartJSNodeCanvas = new ChartJSNodeCanvas({
+    width: CHART_WIDTH,
+    height: CHART_HEIGHT,
+    backgroundColour: "white",
+    plugins: {
+      globalVariableLegacy: ["chartjs-adapter-moment"],
+    },
+  });
+
+  const configuration = {
+    type: "line" as const,
+    data: {
+      datasets: [
+        {
+          label: "HOMA-IR",
+          data: homaIRDataPoints.map((dp) => ({
+            x: new Date(dp.date).getTime(),
+            y: dp.homaIR,
+          })),
+          borderColor: "rgb(75, 192, 192)",
+          tension: 0.1,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "top" as const,
+        },
+        title: {
+          display: true,
+          text: "HOMA-IR Over Time",
+        },
+      },
+      scales: {
+        x: {
+          type: "time" as const,
+          time: {
+            tooltipFormat: "YYYY-MM-DD",
+          },
+          title: {
+            display: true,
+            text: "Date",
+          },
+        },
+        y: {
+          title: {
+            display: true,
+            text: "HOMA-IR",
+          },
+          beginAtZero: true,
+        },
+      },
+    },
+  };
+
+  console.log("\nGenerating chart image...");
+  const imageBuffer = await chartJSNodeCanvas.renderToBuffer(
+    configuration as any
+  );
+  await fs.writeFile(OUTPUT_CHART_FILE, imageBuffer);
+  console.log(`Chart saved to ${OUTPUT_CHART_FILE}`);
+}
+
+async function openDatabase(config: sqlite.ISqlite.Config) {
+  const db = await sqlite.open(config);
+  return {
+    db,
+    [Symbol.asyncDispose]: async () => {
+      await db.close();
+      console.log("\nDatabase connection closed.");
+    },
+  };
 }
 
 main().catch((err) => {
-  console.error("Unhandled error in main function execution:", err);
+  console.error("An error occurred during the script execution:", err);
   process.exit(1);
 });
