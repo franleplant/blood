@@ -1,18 +1,33 @@
+import { ChartJSNodeCanvas } from "chartjs-node-canvas";
+import fs from "fs/promises";
 import path from "path";
 import * as sqlite from "sqlite";
 import sqlite3Driver from "sqlite3";
 import { fileURLToPath } from "url";
+import normalizeGlucose from "../src/normalize_glucose_units.ts";
+// No direct import of Chart from 'chart.js/auto' or 'chartjs-adapter-date-fns' needed here
+// when using the globalVariableLegacy plugin method with ChartJSNodeCanvas.
+// Chart.js core and the adapter specified in plugins should be handled by ChartJSNodeCanvas.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbFilePath = path.resolve(__dirname, "../blood_markers.sqlite");
-const tableName = "lab_results"; // Though the query uses it directly
+const tableName = "lab_results";
+const HOMA_IR_DIVISOR = 405;
+const CHART_WIDTH = 1000;
+const CHART_HEIGHT = 600;
+const OUTPUT_CHART_FILE = path.resolve(__dirname, "../homa_ir_plot.png");
+
+interface HomaIRDataPoint {
+  date: string;
+  homaIR: number;
+}
 
 async function main() {
   console.log(`Querying database: ${dbFilePath}`);
-
   let db: sqlite.Database | undefined;
+  const homaIRDataPoints: HomaIRDataPoint[] = [];
 
   try {
     db = await sqlite.open({
@@ -21,32 +36,50 @@ async function main() {
     });
     console.log("Connected to SQLite database.");
 
+    const distinctInsulinUnitsQuery = `
+SELECT DISTINCT unit FROM ${tableName}
+WHERE LOWER(marker_name_en) LIKE '%insulin%'
+  AND LOWER(marker_name_en) NOT LIKE '%minutes%'
+  AND unit IS NOT NULL AND TRIM(unit) <> '';
+`;
+    console.log("\nFetching distinct insulin units...");
+    const insulinUnitsRows: Array<{ unit: string }> = await db.all(
+      distinctInsulinUnitsQuery
+    );
+    if (insulinUnitsRows.length > 0) {
+      console.log("Found distinct insulin units:");
+      insulinUnitsRows.forEach((row) => console.log(`- '${row.unit}'`));
+    } else {
+      console.log("No distinct insulin units found.");
+    }
+    console.log(
+      "Assuming insulin unit is appropriate for HOMA-IR (e.g., µU/mL).\n---"
+    );
+
     const query = `
 SELECT
   g.date,
-  --g.id AS glucose_id,
   g.value AS glucose_value,
   g.unit AS glucose_unit,
-  --i.id AS insulin_id,
   i.value AS insulin_value,
   i.unit AS insulin_unit
 FROM (
-  SELECT * FROM ${tableName}
+  SELECT date, value, unit, marker_name_en FROM ${tableName}
   WHERE LOWER(marker_name_en) LIKE '%glucose%'
     AND LOWER(marker_name_en) NOT LIKE '%minutes%'
-    AND unit IS NOT NULL
-    AND TRIM(unit) <> ''
+    AND unit IS NOT NULL AND TRIM(unit) <> ''
 ) AS g
 JOIN (
-  SELECT * FROM ${tableName}
+  SELECT date, value, unit, marker_name_en FROM ${tableName}
   WHERE LOWER(marker_name_en) LIKE '%insulin%'
     AND LOWER(marker_name_en) NOT LIKE '%minutes%'
+    AND unit IS NOT NULL AND TRIM(unit) <> ''
 ) AS i
-ON g.date = i.date;
+ON g.date = i.date
+ORDER BY g.date ASC;
 `;
 
-    console.log("Executing query to fetch HOMA-IR data:", query);
-    // Define a more specific type for the results based on the query
+    console.log("\nExecuting query to fetch HOMA-IR data:", query);
     const results: Array<{
       date: string;
       glucose_value: string;
@@ -56,25 +89,129 @@ ON g.date = i.date;
     }> = await db.all(query);
 
     if (results.length === 0) {
-      console.log("No results found for the HOMA-IR query.");
+      console.log("No results found for HOMA-IR data.");
     } else {
-      console.log(`Found ${results.length} rows for HOMA-IR calculation.`);
-      console.log("Query results:");
-      results.forEach((row, index) => {
-        console.log(`Row ${index + 1}:`, JSON.stringify(row, null, 2));
+      console.log(
+        `Found ${results.length} rows. Processing for HOMA-IR and chart data...`
+      );
+      results.forEach((row) => {
+        try {
+          const normalizedGlucose = normalizeGlucose({
+            value: row.glucose_value,
+            unit: row.glucose_unit,
+          });
+          const glucoseValMgDl = parseFloat(normalizedGlucose.value);
+          const insulinValMicroUML = parseFloat(
+            row.insulin_value.replace(",", ".")
+          );
+
+          if (isNaN(glucoseValMgDl) || isNaN(insulinValMicroUML)) {
+            console.warn(
+              `Skipping row (Date: ${row.date}): Invalid number for glucose or insulin.`
+            );
+            return;
+          }
+          const homaIR =
+            (glucoseValMgDl * insulinValMicroUML) / HOMA_IR_DIVISOR;
+          homaIRDataPoints.push({ date: row.date, homaIR });
+          console.log(
+            `Date: ${row.date}, Glucose: ${row.glucose_value} ${
+              row.glucose_unit
+            } -> ${glucoseValMgDl.toFixed(2)} mg/dL, Insulin: ${
+              row.insulin_value
+            } ${row.insulin_unit} -> ${insulinValMicroUML.toFixed(
+              2
+            )} µU/mL, HOMA-IR: ${homaIR.toFixed(2)}`
+          );
+        } catch (error) {
+          console.error(
+            `Error processing row (Date: ${row.date}): ${
+              (error as Error).message
+            }`
+          );
+        }
       });
+
+      if (homaIRDataPoints.length > 0) {
+        console.log(
+          `\nCollected ${homaIRDataPoints.length} data points for charting.`
+        );
+
+        const chartJSNodeCanvas = new ChartJSNodeCanvas({
+          width: CHART_WIDTH,
+          height: CHART_HEIGHT,
+          backgroundColour: "white",
+          plugins: {
+            globalVariableLegacy: ["chartjs-adapter-moment"],
+          },
+        });
+
+        const configuration = {
+          type: "line" as const,
+          data: {
+            datasets: [
+              {
+                label: "HOMA-IR",
+                data: homaIRDataPoints.map((dp) => ({
+                  x: new Date(dp.date).getTime(),
+                  y: dp.homaIR,
+                })),
+                borderColor: "rgb(75, 192, 192)",
+                tension: 0.1,
+                fill: false,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                position: "top" as const,
+              },
+              title: {
+                display: true,
+                text: "HOMA-IR Over Time",
+              },
+            },
+            scales: {
+              x: {
+                type: "time" as const,
+                time: {
+                  tooltipFormat: "YYYY-MM-DD",
+                },
+                title: {
+                  display: true,
+                  text: "Date",
+                },
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: "HOMA-IR",
+                },
+                beginAtZero: true,
+              },
+            },
+          },
+        };
+
+        console.log("\nGenerating chart image...");
+        const imageBuffer = await chartJSNodeCanvas.renderToBuffer(
+          configuration as any
+        );
+        await fs.writeFile(OUTPUT_CHART_FILE, imageBuffer);
+        console.log(`Chart saved to ${OUTPUT_CHART_FILE}`);
+      } else {
+        console.log("No valid data points to chart after processing.");
+      }
     }
   } catch (error) {
     const err = error as Error;
-    console.error(
-      "An error occurred during the database operation:",
-      err.message,
-      err.stack
-    );
+    console.error("An error occurred:", err.message, err.stack);
     process.exit(1);
   } finally {
     if (db) {
-      console.log("Closing database connection...");
+      console.log("\nClosing database connection...");
       try {
         await db.close();
         console.log("Database connection closed.");
