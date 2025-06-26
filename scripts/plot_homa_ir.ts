@@ -25,56 +25,33 @@ interface HomaIRDataPoint {
 }
 
 async function main() {
-  console.log(`Querying database: ${dbFilePath}`);
-
   await using connection = await openDatabase({
     filename: dbFilePath,
     driver: sqlite3Driver.Database,
   });
   const { db } = connection;
-  console.log("Connected to SQLite database.");
-
-  const distinctInsulinUnitsQuery = `
-SELECT DISTINCT unit FROM ${tableName}
-WHERE LOWER(marker_name_en) LIKE '%insulin%'
-  AND LOWER(marker_name_en) NOT LIKE '%minutes%'
-  AND unit IS NOT NULL AND TRIM(unit) <> '';
-`;
-  console.log("\nFetching distinct insulin units...");
-  const insulinUnitsRows: Array<{ unit: string }> = await db.all(
-    distinctInsulinUnitsQuery
-  );
-  if (insulinUnitsRows.length > 0) {
-    console.log("Found distinct insulin units:");
-    insulinUnitsRows.forEach((row) => console.log(`- '${row.unit}'`));
-  } else {
-    console.log("No distinct insulin units found.");
-  }
-  console.log(
-    "Assuming insulin unit is appropriate for HOMA-IR (e.g., µU/mL).\n---"
-  );
 
   const query = `
-SELECT
-  g.date,
-  g.value AS glucose_value,
-  g.unit AS glucose_unit,
-  i.value AS insulin_value,
-  i.unit AS insulin_unit
-FROM (
-  SELECT date, value, unit, marker_name_en FROM ${tableName}
-  WHERE LOWER(marker_name_en) LIKE '%glucose%'
-    AND LOWER(marker_name_en) NOT LIKE '%minutes%'
-    AND unit IS NOT NULL AND TRIM(unit) <> ''
-) AS g
-JOIN (
-  SELECT date, value, unit, marker_name_en FROM ${tableName}
-  WHERE LOWER(marker_name_en) LIKE '%insulin%'
-    AND LOWER(marker_name_en) NOT LIKE '%minutes%'
-    AND unit IS NOT NULL AND TRIM(unit) <> ''
-) AS i
-ON g.date = i.date
-ORDER BY g.date ASC;
+    SELECT
+    g.date,
+    g.value AS glucose_value,
+    g.unit AS glucose_unit,
+    i.value AS insulin_value,
+    i.unit AS insulin_unit
+    FROM (
+    SELECT date, value, unit, marker_name_en FROM ${tableName}
+    WHERE LOWER(marker_name_en) LIKE '%glucose%'
+        AND LOWER(marker_name_en) NOT LIKE '%minutes%'
+        AND unit IS NOT NULL AND TRIM(unit) <> ''
+    ) AS g
+    JOIN (
+    SELECT date, value, unit, marker_name_en FROM ${tableName}
+    WHERE LOWER(marker_name_en) LIKE '%insulin%'
+        AND LOWER(marker_name_en) NOT LIKE '%minutes%'
+        AND unit IS NOT NULL AND TRIM(unit) <> ''
+    ) AS i
+    ON g.date = i.date
+    ORDER BY g.date ASC;
 `;
 
   console.log("\nExecuting query to fetch HOMA-IR data:", query);
@@ -88,9 +65,17 @@ ORDER BY g.date ASC;
     `Found ${results.length} rows. Processing for HOMA-IR and chart data...`
   );
 
-  const homaIRDataPoints: HomaIRDataPoint[] = results
+  const homaIRDataPoints: Array<HomaIRDataPoint> = results
     .map((row) => {
       try {
+        const correctInsulinUnit = "µUI/ml";
+        if (row.insulin_unit !== correctInsulinUnit) {
+          console.warn(
+            `Skipping row (Date: ${row.date}): Invalid insulin unit '${row.insulin_unit}'. Expected '${correctInsulinUnit}'.`
+          );
+          return null;
+        }
+
         const normalizedGlucose = normalizeGlucose({
           value: row.glucose_value,
           unit: row.glucose_unit,
@@ -129,10 +114,6 @@ ORDER BY g.date ASC;
     })
     .filter((point): point is HomaIRDataPoint => point !== null);
 
-  if (homaIRDataPoints.length === 0) {
-    console.log("No valid data points to chart after processing.");
-    return;
-  }
   console.log(
     `\nCollected ${homaIRDataPoints.length} data points for charting.`
   );
@@ -140,7 +121,7 @@ ORDER BY g.date ASC;
   await generateChart(homaIRDataPoints);
 }
 
-async function generateChart(homaIRDataPoints: HomaIRDataPoint[]) {
+async function generateChart(homaIRDataPoints: Array<HomaIRDataPoint>) {
   const chartJSNodeCanvas = new ChartJSNodeCanvas({
     width: CHART_WIDTH,
     height: CHART_HEIGHT,
