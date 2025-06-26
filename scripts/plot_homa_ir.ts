@@ -1,9 +1,9 @@
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "fs/promises";
 import path from "path";
-import * as sqlite from "sqlite";
 import sqlite3Driver from "sqlite3";
 import { fileURLToPath } from "url";
+import { openDatabase } from "../src/db.ts";
 import normalizeGlucose from "../src/normalize_glucose_units.ts";
 // No direct import of Chart from 'chart.js/auto' or 'chartjs-adapter-date-fns' needed here
 // when using the globalVariableLegacy plugin method with ChartJSNodeCanvas.
@@ -205,17 +205,6 @@ async function generateChart(homaIRDataPoints: HomaIRDataPoint[]) {
   );
   await fs.writeFile(OUTPUT_CHART_FILE, imageBuffer);
   console.log(`Chart saved to ${OUTPUT_CHART_FILE}`);
-}
-
-async function openDatabase(config: sqlite.ISqlite.Config) {
-  const db = await sqlite.open(config);
-  return {
-    db,
-    [Symbol.asyncDispose]: async () => {
-      await db.close();
-      console.log("\nDatabase connection closed.");
-    },
-  };
 }
 
 main().catch((err) => {
