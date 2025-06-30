@@ -10,7 +10,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { openDatabase } from "@/lib/db";
-import normalizeGlucose from "@/lib/normalize_glucose_units";
 import {
   LabResultsRow,
   labResultsRowSchema,
@@ -25,7 +24,6 @@ async function getBloodMarkers(): Promise<LabResultsRow[]> {
   });
 
   const markers = await db.all("SELECT * FROM lab_results ORDER BY date DESC");
-  console.log(markers);
   const parsedMarkers = z.array(labResultsRowSchema).parse(markers);
 
   return parsedMarkers;
@@ -33,24 +31,6 @@ async function getBloodMarkers(): Promise<LabResultsRow[]> {
 
 export default async function Home() {
   const markers = await getBloodMarkers();
-  const normalizedMarkers = markers.map((marker) => {
-    if (
-      marker.marker_name_en === "Glucose" &&
-      typeof marker.value === "number" &&
-      marker.unit
-    ) {
-      const result = normalizeGlucose({
-        value: marker.value.toString(),
-        unit: marker.unit,
-      });
-      return {
-        ...marker,
-        value: result.value,
-        unit: result.unit,
-      };
-    }
-    return marker;
-  });
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
@@ -59,8 +39,8 @@ export default async function Home() {
       </div>
 
       <div className="w-full max-w-5xl">
-        <h2 className="text-2xl font-bold text-center my-4">Glucose</h2>
-        <GlucoseChart data={normalizedMarkers} />
+        <h2 className="text-2xl font-bold text-center my-4">Fasting Glucose</h2>
+        <GlucoseChart />
       </div>
 
       <div className="w-full max-w-5xl mt-8">
@@ -75,21 +55,21 @@ export default async function Home() {
             <TableRow>
               <TableHead className="w-[100px]">Date</TableHead>
               <TableHead>Marker</TableHead>
-              <TableHead>Marker</TableHead>
               <TableHead className="text-right">Value</TableHead>
               <TableHead>Unit</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {normalizedMarkers.map((marker) => (
+            {markers.map((marker) => (
               <TableRow key={marker.id}>
                 <TableCell className="font-medium">
                   {marker.date.toLocaleDateString()}
                 </TableCell>
                 <TableCell>{marker.marker_name_en}</TableCell>
-                <TableCell>{marker.marker_name_es}</TableCell>
                 <TableCell className="text-right">
-                  {marker.value.toString()}
+                  {typeof marker.value === "number"
+                    ? marker.value.toFixed(2)
+                    : marker.value}
                 </TableCell>
                 <TableCell>{marker.unit}</TableCell>
               </TableRow>

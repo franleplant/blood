@@ -1,57 +1,53 @@
-"use client";
+import GlucoseChartClient from "@/components/GlucoseChartClient";
+import { openDatabase } from "@/lib/db";
+import normalizeGlucose from "@/lib/normalize_glucose_units";
+import { labResultsRowSchema } from "@/lib/schemas/labResultsRow";
+import sqlite3 from "sqlite3";
+import { z } from "zod";
 
-import { LabResultsRow } from "@/lib/schemas/labResultsRow";
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+async function getGlucoseData() {
+  const { db } = await openDatabase({
+    filename: "./blood_markers.sqlite",
+    driver: sqlite3.Database,
+  });
 
-export default function GlucoseChart({ data }: { data: LabResultsRow[] }) {
-  const glucoseData = data
-    .filter((marker) => marker.marker_name_en === "Glucose")
-    .map((marker) => ({
-      date: marker.date.getTime(),
-      value: Number(marker.value),
-    }));
+  const query = `
+    SELECT * FROM lab_results
+    WHERE LOWER(marker_name_en) LIKE '%glucose%'
+      AND LOWER(marker_name_en) NOT LIKE '%minutes%'
+      AND unit IS NOT NULL
+      AND TRIM(unit) <> '';
+  `;
 
-  return (
-    <ResponsiveContainer width="100%" height={400}>
-      <LineChart
-        data={glucoseData}
-        margin={{
-          top: 20,
-          right: 30,
-          left: 20,
-          bottom: 5,
-        }}
-      >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis
-          dataKey="date"
-          type="number"
-          scale="time"
-          domain={["dataMin", "dataMax"]}
-          tickFormatter={(unixTime) => new Date(unixTime).toLocaleDateString()}
-        />
-        <YAxis />
-        <Tooltip
-          labelFormatter={(label) => new Date(label).toLocaleDateString()}
-        />
-        <Legend />
-        <Line
-          type="monotone"
-          dataKey="value"
-          name="Glucose"
-          stroke="#8884d8"
-          activeDot={{ r: 8 }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  );
+  const results = await db.all(query);
+  const parsedResults = z.array(labResultsRowSchema).safeParse(results);
+
+  if (!parsedResults.success) {
+    console.error("Error parsing glucose data:", parsedResults.error);
+    return [];
+  }
+
+  const glucoseDataPoints = parsedResults.data.map((row) => {
+    const normalized = normalizeGlucose({
+      value: String(row.value),
+      unit: row.unit ?? "",
+    });
+    return {
+      date: row.date.getTime(),
+      value: parseFloat(normalized.value),
+    };
+  });
+
+  return glucoseDataPoints;
+}
+
+export default async function GlucoseChart() {
+  const data = await getGlucoseData();
+
+  if (data.length === 0) {
+    return (
+      <div className="w-full text-center p-4">No glucose data to display.</div>
+    );
+  }
+  return <GlucoseChartClient data={data} />;
 }
