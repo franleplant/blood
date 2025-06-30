@@ -10,34 +10,42 @@ import {
 } from "@/components/ui/table";
 import { openDatabase } from "@/lib/db";
 import normalizeGlucose from "@/lib/normalize_glucose_units";
+import {
+  LabResultsRow,
+  labResultsRowSchema,
+} from "@/lib/schemas/labResultsRow";
+import sqlite3 from "sqlite3";
+import { z } from "zod";
 
-interface BloodMarker {
-  id: number;
-  marker_name_en: string;
-  value: string;
-  unit: string;
-  date: string;
-}
-
-async function getBloodMarkers(): Promise<BloodMarker[]> {
-  const sqlite3 = await import("sqlite3");
+async function getBloodMarkers(): Promise<LabResultsRow[]> {
   const { db } = await openDatabase({
     filename: "./blood_markers.sqlite",
     driver: sqlite3.Database,
   });
 
   const markers = await db.all("SELECT * FROM lab_results ORDER BY date DESC");
+  console.log(markers);
+  const parsedMarkers = z.array(labResultsRowSchema).parse(markers);
 
-  return markers as BloodMarker[];
+  return parsedMarkers;
 }
 
 export default async function Home() {
   const markers = await getBloodMarkers();
   const normalizedMarkers = markers.map((marker) => {
-    if (marker.marker === "Glucose") {
+    if (
+      marker.marker_name_en === "Glucose" &&
+      typeof marker.value === "number" &&
+      marker.unit
+    ) {
+      const result = normalizeGlucose({
+        value: marker.value.toString(),
+        unit: marker.unit,
+      });
       return {
         ...marker,
-        ...normalizeGlucose(marker),
+        value: result.value,
+        unit: result.unit,
       };
     }
     return marker;
@@ -50,7 +58,7 @@ export default async function Home() {
       </div>
 
       <div className="w-full max-w-5xl">
-        <GlucoseChart data={markers} />
+        <GlucoseChart data={normalizedMarkers} />
       </div>
 
       <div className="w-full max-w-5xl">
@@ -58,18 +66,22 @@ export default async function Home() {
           <TableCaption>A list of your recent blood markers.</TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
+              <TableHead className="w-[100px]">Date</TableHead>
               <TableHead>Marker</TableHead>
-              <TableHead>Value</TableHead>
+              <TableHead className="text-right">Value</TableHead>
               <TableHead>Unit</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {markers.map((marker) => (
+            {normalizedMarkers.map((marker) => (
               <TableRow key={marker.id}>
-                <TableCell>{marker.date}</TableCell>
+                <TableCell className="font-medium">
+                  {marker.date.toLocaleDateString()}
+                </TableCell>
                 <TableCell>{marker.marker_name_en}</TableCell>
-                <TableCell>{marker.value}</TableCell>
+                <TableCell className="text-right">
+                  {marker.value.toString()}
+                </TableCell>
                 <TableCell>{marker.unit}</TableCell>
               </TableRow>
             ))}

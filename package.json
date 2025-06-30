@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
@@ -35,6 +36,7 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.395.0",
     "next": "15.3.4",
+    "papaparse": "^5.5.3",
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^2.12.7",
@@ -42,6 +44,7 @@
     "sqlite3": "^5.1.7",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
-    "tsx": "^4.20.3"
+    "tsx": "^4.20.3",
+    "zod": "^3.25.67"
   }
 }

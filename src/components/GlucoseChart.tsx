@@ -1,5 +1,6 @@
 "use client";
 
+import { LabResultsRow } from "@/lib/schemas/labResultsRow";
 import {
   CartesianGrid,
   Legend,
@@ -10,18 +11,14 @@ import {
   YAxis,
 } from "recharts";
 
-interface BloodMarker {
-  id: number;
-  marker_name_en: string;
-  value: string;
-  unit: string;
-  date: string;
-}
-
-export default function GlucoseChart({ data }: { data: BloodMarker[] }) {
-  const glucoseData = data.filter(
-    (marker) => marker.marker_name_en === "Glucose"
-  );
+export default function GlucoseChart({ data }: { data: LabResultsRow[] }) {
+  const glucoseData = data
+    .filter((marker) => marker.marker_name_en === "Glucose")
+    .map((marker) => ({
+      ...marker,
+      date: marker.date.toLocaleDateString(),
+      value: Number(marker.value),
+    }));
 
   return (
     <LineChart
