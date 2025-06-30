@@ -1,4 +1,5 @@
 import GlucoseChart from "@/components/GlucoseChart";
+import HomaIRChart from "@/components/HomaIRChart";
 import {
   Table,
   TableBody,
@@ -58,7 +59,13 @@ export default async function Home() {
       </div>
 
       <div className="w-full max-w-5xl">
+        <h2 className="text-2xl font-bold text-center my-4">Glucose</h2>
         <GlucoseChart data={normalizedMarkers} />
+      </div>
+
+      <div className="w-full max-w-5xl mt-8">
+        <h2 className="text-2xl font-bold text-center my-4">HOMA-IR</h2>
+        <HomaIRChart />
       </div>
 
       <div className="w-full max-w-5xl">
@@ -67,6 +74,7 @@ export default async function Home() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[100px]">Date</TableHead>
+              <TableHead>Marker</TableHead>
               <TableHead>Marker</TableHead>
               <TableHead className="text-right">Value</TableHead>
               <TableHead>Unit</TableHead>
@@ -79,6 +87,7 @@ export default async function Home() {
                   {marker.date.toLocaleDateString()}
                 </TableCell>
                 <TableCell>{marker.marker_name_en}</TableCell>
+                <TableCell>{marker.marker_name_es}</TableCell>
                 <TableCell className="text-right">
                   {marker.value.toString()}
                 </TableCell>
