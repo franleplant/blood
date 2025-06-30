@@ -12,14 +12,16 @@ import {
 
 interface BloodMarker {
   id: number;
-  marker: string;
+  marker_name_en: string;
   value: string;
   unit: string;
   date: string;
 }
 
 export default function GlucoseChart({ data }: { data: BloodMarker[] }) {
-  const glucoseData = data.filter((marker) => marker.marker === "Glucose");
+  const glucoseData = data.filter(
+    (marker) => marker.marker_name_en === "Glucose"
+  );
 
   return (
     <LineChart
