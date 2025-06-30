@@ -3,29 +3,34 @@ type PartialRow = {
   unit: string;
 };
 
-export default function normalizeUnits(row: PartialRow): PartialRow {
+type TargetUnit = "mg/dL";
+
+function toMgPerDL(row: PartialRow): number {
   const unit = row.unit.trim().toLowerCase();
   const rawValue = parseFloat(row.value.replace(",", "."));
 
-  let normalized: number;
-
   switch (unit) {
-    case "mg/dl": {
-      normalized = rawValue;
-      break;
-    }
+    case "mg/dl":
+      return rawValue;
     case "g/l":
-    case "gr o/oo": {
-      normalized = rawValue * 100;
-      break;
-    }
-    default: {
+    case "gr o/oo":
+      return rawValue * 100;
+    default:
       throw new Error(`Unsupported unit for glucose: "${row.unit}"`);
-    }
   }
+}
 
-  return {
-    value: normalized.toString(),
-    unit: "mg/dL",
-  };
+export default function normalizeUnits(
+  row: PartialRow,
+  targetUnit: TargetUnit
+): PartialRow {
+  const valueInMgPerDL = toMgPerDL(row);
+
+  switch (targetUnit) {
+    case "mg/dL":
+      return {
+        value: valueInMgPerDL.toString(),
+        unit: targetUnit,
+      };
+  }
 }
