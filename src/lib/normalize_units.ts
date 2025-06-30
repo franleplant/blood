@@ -3,7 +3,7 @@ type PartialRow = {
   unit: string;
 };
 
-export default function normalizeGlucose(row: PartialRow): PartialRow {
+export default function normalizeUnits(row: PartialRow): PartialRow {
   const unit = row.unit.trim().toLowerCase();
   const rawValue = parseFloat(row.value.replace(",", "."));
 
