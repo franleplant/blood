@@ -5,6 +5,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -45,12 +46,15 @@ export default function HomaIRChartClient({
           domain={["dataMin", "dataMax"]}
           tickFormatter={(unixTime) => new Date(unixTime).toLocaleDateString()}
         />
-        <YAxis />
+        <YAxis
+          domain={["auto", (dataMax: number) => Math.max(dataMax + 0.2, 2.2)]}
+        />
         <Tooltip
           labelFormatter={(label) => new Date(label).toLocaleDateString()}
           formatter={(value: number) => value.toFixed(2)}
         />
         <Legend />
+        <ReferenceLine y={2} stroke="red" label="2" />
         <Line
           type="monotone"
           dataKey="HOMA-IR"

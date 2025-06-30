@@ -5,6 +5,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -40,11 +41,17 @@ export default function GlucoseChartClient({
           domain={["dataMin", "dataMax"]}
           tickFormatter={(unixTime) => new Date(unixTime).toLocaleDateString()}
         />
-        <YAxis domain={["dataMin - 2", "dataMax + 2"]} />
+        <YAxis
+          domain={[
+            "dataMin - 2",
+            (dataMax: number) => Math.max(dataMax + 2, 102),
+          ]}
+        />
         <Tooltip
           labelFormatter={(label) => new Date(label).toLocaleDateString()}
         />
         <Legend />
+        <ReferenceLine y={100} stroke="red" label="100" />
         <Line
           type="monotone"
           dataKey="value"
