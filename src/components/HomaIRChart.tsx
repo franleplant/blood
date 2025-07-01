@@ -4,7 +4,11 @@ import HomaIRChartClient from "./HomaIRChartClient";
 
 const HOMA_IR_DIVISOR = 405;
 
-async function getHomaIRData() {
+interface Props {
+  userId: number;
+}
+
+async function getHomaIRData(userId: number) {
   const { prisma } = await openDatabase();
 
   const results = await prisma.$queryRaw<
@@ -27,12 +31,14 @@ async function getHomaIRData() {
       WHERE LOWER(marker_name_en) LIKE '%glucose%'
         AND LOWER(marker_name_en) NOT LIKE '%minutes%'
         AND unit IS NOT NULL AND TRIM(unit) <> ''
+        AND user_id = ${userId}
     ) AS g
     JOIN (
       SELECT date, value, unit, marker_name_en FROM lab_results
       WHERE LOWER(marker_name_en) LIKE '%insulin%'
         AND LOWER(marker_name_en) NOT LIKE '%minutes%'
         AND unit IS NOT NULL AND TRIM(unit) <> ''
+        AND user_id = ${userId}
     ) AS i
     ON g.date = i.date
     ORDER BY g.date ASC
@@ -80,8 +86,8 @@ async function getHomaIRData() {
   return homaIRDataPoints;
 }
 
-export default async function HomaIRChart() {
-  const data = await getHomaIRData();
+export default async function HomaIRChart({ userId }: Props) {
+  const data = await getHomaIRData(userId);
   if (data.length === 0) {
     return (
       <div className="w-full text-center p-4">

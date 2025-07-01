@@ -14,17 +14,17 @@ export default async function Home() {
           <h2 className="text-2xl font-bold text-center my-4">
             Fasting Glucose
           </h2>
-          <GlucoseChart />
+          <GlucoseChart userId={1} />
         </div>
         <div className="w-full lg:w-1/2">
           <h2 className="text-2xl font-bold text-center my-4">HOMA-IR</h2>
-          <HomaIRChart />
+          <HomaIRChart userId={1} />
         </div>
       </div>
 
       <div className="w-full max-w-5xl mt-8">
         <h2 className="text-2xl font-bold text-center my-4">All Markers</h2>
-        <MarkersTable />
+        <MarkersTable userId={1} />
       </div>
     </main>
   );

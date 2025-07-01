@@ -2,11 +2,16 @@ import GlucoseChartClient from "@/components/GlucoseChartClient";
 import { openDatabase } from "@/lib/db";
 import normalizeGlucose from "@/lib/normalize_glucose_units";
 
-async function getGlucoseData() {
+interface Props {
+  userId: number;
+}
+
+async function getGlucoseData(userId: number) {
   const { prisma } = await openDatabase();
 
   const results = await prisma.labResult.findMany({
     where: {
+      user_id: userId,
       marker_name_en: {
         contains: "glucose",
       },
@@ -38,8 +43,8 @@ async function getGlucoseData() {
   return glucoseDataPoints;
 }
 
-export default async function GlucoseChart() {
-  const data = await getGlucoseData();
+export default async function GlucoseChart({ userId }: Props) {
+  const data = await getGlucoseData(userId);
 
   if (data.length === 0) {
     return (
