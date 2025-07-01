@@ -8,6 +8,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id     Int     @id @default(autoincrement())
+  name   String
+  height Float?
+  gender String?
+
+  // Relations
+  labResults LabResult[]
+  events     Event[]
+
+  @@map("users")
+}
+
 model LabResult {
   id                    Int     @id @default(autoincrement())
   date                  String // Required field
@@ -22,6 +35,10 @@ model LabResult {
   comments              String?
   other                 String?
 
+  // Foreign key and relation
+  user_id Int
+  user    User @relation(fields: [user_id], references: [id])
+
   @@map("lab_results")
 }
 
@@ -30,6 +47,10 @@ model Event {
   date        String // Required field
   title       String // Required field
   description String // Required field
+
+  // Foreign key and relation
+  user_id Int
+  user    User @relation(fields: [user_id], references: [id])
 
   @@map("events")
 }
