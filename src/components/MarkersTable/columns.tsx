@@ -1,11 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { LabResultsRow } from "@/lib/schemas/labResultsRow";
+import type { LabResult } from "@/generated/prisma";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
 
-export const columns: ColumnDef<LabResultsRow>[] = [
+export const columns: Array<ColumnDef<LabResult>> = [
   {
     accessorKey: "date",
     header: ({ column }) => {

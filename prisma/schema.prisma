@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model LabResult {
+  id                    Int     @id @default(autoincrement())
+  date                  String // Required field
+  marker_name_es        String // Required field  
+  marker_name_en        String // Required field
+  value                 String // Required field
+  unit                  String?
+  reference_range       String?
+  lab_name              String?
+  doctor_protocol_notes String?
+  derived               String?
+  comments              String?
+  other                 String?
+
+  @@map("lab_results")
+}

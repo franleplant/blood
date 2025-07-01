@@ -123,3 +123,4 @@ site
 # Dist and temp folders
 dist/
 .temp/ 
+/src/generated/prisma

@@ -1,28 +1,26 @@
-import * as sqlite from "sqlite";
-import sqlite3 from "sqlite3";
+import { PrismaClient } from "../generated/prisma";
 
-const defaultConfig = {
-  filename: "./blood_markers.sqlite",
-  driver: sqlite3.Database,
+const prismaGlobal = globalThis as typeof globalThis & {
+  prisma?: PrismaClient;
 };
 
-export async function openDatabase(
-  config: Partial<sqlite.ISqlite.Config> = {}
-) {
-  const finalConfig = { ...defaultConfig, ...config };
-  const db = await sqlite.open(finalConfig);
-  console.log(`>>> SQL: connected to ${finalConfig.filename}`);
+export async function openDatabase() {
+  // Use singleton pattern for Prisma client to avoid connection issues
+  if (!prismaGlobal.prisma) {
+    prismaGlobal.prisma = new PrismaClient({
+      log: ["query", "info", "warn", "error"],
+    });
+    console.log(`>>> Prisma: connected to database`);
+  }
 
-  const rawDb = db.getDatabaseInstance();
-  rawDb.on("trace", (query: string) => {
-    console.log(`>>> SQL: ${query}`);
-  });
+  const prisma = prismaGlobal.prisma;
 
   return {
-    db,
+    prisma,
+    db: prisma, // Alias for backward compatibility
     [Symbol.asyncDispose]: async () => {
-      await db.close();
-      console.log(`>>> SQL: closed connection to ${finalConfig.filename}`);
+      await prisma.$disconnect();
+      console.log(`>>> Prisma: disconnected from database`);
     },
   };
 }
