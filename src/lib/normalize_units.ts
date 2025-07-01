@@ -11,12 +11,16 @@ function toMgPerDL(row: PartialRow): number {
 
   switch (unit) {
     case "mg/dl":
+    case "mg %":
       return rawValue;
     case "g/l":
+    case "gr/lt":
     case "gr o/oo":
       return rawValue * 100;
     default:
-      throw new Error(`Unsupported unit for glucose: "${row.unit}"`);
+      throw new Error(
+        `Unsupported unit for conversion to mg/dL: "${row.unit}"`
+      );
   }
 }
 

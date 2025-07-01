@@ -1,4 +1,5 @@
 import { openDatabase } from "@/lib/db";
+import normalizeUnits from "@/lib/normalize_units";
 import TriglyceridesHDLRatioChartClient from "./TriglyceridesHDLRatioChartClient";
 
 interface Props {
@@ -42,43 +43,35 @@ async function getTriglyceridesHDLRatioData(userId: number) {
   const ratioDataPoints = results
     .map((row) => {
       try {
-        // Normalize triglycerides to mg/dL
-        let triglyceridesMgDl = parseFloat(String(row.triglycerides_value));
-        const trigUnit = row.triglycerides_unit.toLowerCase();
-
-        if (
-          trigUnit === "mg %" ||
-          trigUnit === "mg/dl" ||
-          trigUnit === "mg/dl"
-        ) {
-          // Already in mg/dL or equivalent
-          triglyceridesMgDl = triglyceridesMgDl;
-        } else if (trigUnit === "g/l" || trigUnit === "gr/lt") {
-          // Convert g/L to mg/dL (multiply by 100)
-          triglyceridesMgDl = triglyceridesMgDl * 100;
-        } else {
+        if (!row.triglycerides_unit) {
           console.warn(
-            `Skipping row (Date: ${row.date}): Unsupported triglycerides unit '${row.triglycerides_unit}'.`
+            `Skipping row (Date: ${row.date}): Missing triglycerides unit.`
           );
           return null;
         }
 
-        // Normalize HDL to mg/dL
-        let hdlMgDl = parseFloat(String(row.hdl_value));
-        const hdlUnit = row.hdl_unit.toLowerCase();
+        const normalizedTriglycerides = normalizeUnits(
+          {
+            value: String(row.triglycerides_value),
+            unit: row.triglycerides_unit,
+          },
+          "mg/dL"
+        );
+        const triglyceridesMgDl = parseFloat(normalizedTriglycerides.value);
 
-        if (hdlUnit === "mg/dl" || hdlUnit === "mg/dl") {
-          // Already in mg/dL
-          hdlMgDl = hdlMgDl;
-        } else if (hdlUnit === "g/l" || hdlUnit === "gr/lt") {
-          // Convert g/L to mg/dL (multiply by 38.67 for cholesterol)
-          hdlMgDl = hdlMgDl * 38.67;
-        } else {
-          console.warn(
-            `Skipping row (Date: ${row.date}): Unsupported HDL unit '${row.hdl_unit}'.`
-          );
+        if (!row.hdl_unit) {
+          console.warn(`Skipping row (Date: ${row.date}): Missing HDL unit.`);
           return null;
         }
+
+        const normalizedHdl = normalizeUnits(
+          {
+            value: String(row.hdl_value),
+            unit: row.hdl_unit,
+          },
+          "mg/dL"
+        );
+        const hdlMgDl = parseFloat(normalizedHdl.value);
 
         if (isNaN(triglyceridesMgDl) || isNaN(hdlMgDl) || hdlMgDl === 0) {
           console.warn(

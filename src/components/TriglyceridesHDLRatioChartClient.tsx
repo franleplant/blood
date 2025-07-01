@@ -141,21 +141,21 @@ export default function TriglyceridesHDLRatioChartClient({
         />
         <Legend />
         <ReferenceLine
-          y={1.5}
+          y={2}
           stroke="green"
           strokeDasharray="5 5"
           label={{
-            value: "Optimal 1.5",
+            value: "Ideal (2.0)",
             position: "insideLeft",
             offset: 10,
           }}
         />
         <ReferenceLine
-          y={3}
+          y={4}
           stroke="red"
           strokeDasharray="5 5"
           label={{
-            value: "High 3",
+            value: "High (4.0)",
             position: "insideLeft",
             offset: 10,
           }}
