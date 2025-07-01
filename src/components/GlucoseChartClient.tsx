@@ -33,7 +33,6 @@ export default function GlucoseChartClient({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold mb-2">Glucose Levels</h3>
         <ResponsiveContainer width="100%" height={400}>
           <LineChart
             data={data}
@@ -74,16 +73,20 @@ export default function GlucoseChartClient({
             />
             <ReferenceLine
               y={100}
-              stroke="#green"
+              stroke="green"
               strokeDasharray="5 5"
-              label="Normal (100)"
+              label={{
+                value: "Normal (100)",
+                position: "insideLeft",
+                offset: 10,
+              }}
             />
-            <ReferenceLine
+            {/* <ReferenceLine
               y={126}
               stroke="#red"
               strokeDasharray="5 5"
               label="Diabetes (126)"
-            />
+            /> */}
             {/* Event Reference Lines */}
             {events.map((event, index) => (
               <ReferenceLine
@@ -93,6 +96,7 @@ export default function GlucoseChartClient({
                 strokeDasharray="5 5"
                 label={{
                   value: event.title,
+                  position: "top",
                   offset: 10,
                   style: {
                     fontSize: "12px",

@@ -72,6 +72,7 @@ export default function HomaIRChartClient({
             label={{
               value: event.title,
               offset: 10,
+              position: "top",
               style: {
                 fontSize: "12px",
                 fill: "#ff7300",
