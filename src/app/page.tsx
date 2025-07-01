@@ -3,10 +3,10 @@ import HemoglobinA1cChart from "@/components/HemoglobinA1cChart";
 import HomaIRChart from "@/components/HomaIRChart";
 import MarkersTable from "@/components/MarkersTable";
 import TriglyceridesHDLRatioChart from "@/components/TriglyceridesHDLRatioChart";
+import UricAcidChart from "@/components/UricAcidChart";
 
 export default async function Home() {
   const userId = 1; // Example user ID
-
   return (
     <main className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
       <div className="text-center mb-12">
@@ -39,6 +39,10 @@ export default async function Home() {
               Triglycerides/HDL Ratio
             </h2>
             <TriglyceridesHDLRatioChart userId={userId} />
+          </div>
+          <div className="p-4 border rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Uric Acid</h2>
+            <UricAcidChart />
           </div>
         </div>
 
