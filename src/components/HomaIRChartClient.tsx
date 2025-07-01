@@ -138,7 +138,6 @@ export default function HomaIRChartClient({
           name="HOMA-IR"
           stroke="#82ca9d"
           strokeWidth={2}
-          dot={false}
           activeDot={{ r: 8 }}
           connectNulls={true}
         />

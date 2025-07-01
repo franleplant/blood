@@ -1,4 +1,5 @@
 import GlucoseChart from "@/components/GlucoseChart";
+import HemoglobinA1cChart from "@/components/HemoglobinA1cChart";
 import HomaIRChart from "@/components/HomaIRChart";
 import MarkersTable from "@/components/MarkersTable";
 import TriglyceridesHDLRatioChart from "@/components/TriglyceridesHDLRatioChart";
@@ -22,6 +23,12 @@ export default async function Home() {
           <div className="p-4 border rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold mb-4">Glucose</h2>
             <GlucoseChart userId={userId} />
+          </div>
+          <div className="p-4 border rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">
+              Glycated Hemoglobin (HbA1c)
+            </h2>
+            <HemoglobinA1cChart userId={userId} />
           </div>
           <div className="p-4 border rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold mb-4">HOMA-IR</h2>

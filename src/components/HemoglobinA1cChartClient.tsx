@@ -13,7 +13,7 @@ import {
   YAxis,
 } from "recharts";
 
-interface GlucoseDataPoint {
+interface HemoglobinA1cDataPoint {
   date: number;
   value: number;
 }
@@ -26,37 +26,33 @@ interface EventDataPoint {
 
 interface ChartDataPoint {
   date: number;
-  glucose?: number;
+  hba1c?: number;
   eventValue?: number;
   eventTitle?: string;
   eventDescription?: string;
 }
 
-export default function GlucoseChartClient({
+export default function HemoglobinA1cChartClient({
   data,
   events,
 }: {
-  data: GlucoseDataPoint[];
+  data: HemoglobinA1cDataPoint[];
   events: EventDataPoint[];
 }) {
-  // Filter events for medication events
   const medicationEvents = events.filter(
     (e) =>
       e.title.toLowerCase().includes("metofirm") ||
       e.title.toLowerCase().includes("ozempic")
   );
 
-  // Combine glucose data and events into a single dataset
   const chartData: ChartDataPoint[] = [
-    // Add glucose data points
     ...data.map((point) => ({
       date: point.date,
-      glucose: point.value,
+      hba1c: point.value,
     })),
-    // Add event data points (positioned at a fixed glucose level for visibility)
     ...medicationEvents.map((event) => ({
       date: event.date.getTime(),
-      eventValue: 50, // Fixed position for events on the chart
+      eventValue: 5,
       eventTitle: event.title,
       eventDescription: event.description,
     })),
@@ -86,12 +82,12 @@ export default function GlucoseChartClient({
                 new Date(unixTime).toLocaleDateString()
               }
             />
-            <YAxis domain={["dataMin", "dataMax + 10"]} />
+            <YAxis domain={["dataMin - 1", "dataMax + 1"]} />
             <Tooltip
               labelFormatter={(label) => new Date(label).toLocaleDateString()}
               formatter={(value: number, name: string) => {
-                if (name === "Glucose") {
-                  return [`${value} mg/dL`, "Glucose"];
+                if (name === "HbA1c") {
+                  return [`${value} %`, "HbA1c"];
                 }
                 return [value, name];
               }}
@@ -103,10 +99,10 @@ export default function GlucoseChartClient({
                         {new Date(label as number).toLocaleDateString()}
                       </p>
                       {payload.map((entry, index) => {
-                        if (entry.dataKey === "glucose" && entry.value) {
+                        if (entry.dataKey === "hba1c" && entry.value) {
                           return (
                             <p key={index} style={{ color: entry.color }}>
-                              Glucose: {entry.value} mg/dL
+                              HbA1c: {entry.value} %
                             </p>
                           );
                         }
@@ -129,40 +125,47 @@ export default function GlucoseChartClient({
             />
             <Legend />
 
-            {/* Reference Lines for Glucose Ranges */}
             <ReferenceLine
-              y={70}
+              y={5.7}
               stroke="orange"
               strokeDasharray="5 5"
               label={{
-                value: "Low (70)",
+                value: "Standard 5.7%",
                 position: "insideLeft",
                 offset: 10,
               }}
             />
             <ReferenceLine
-              y={100}
+              y={5.4}
               stroke="green"
               strokeDasharray="5 5"
               label={{
-                value: "Normal (100)",
+                value: "Optimal 5.4",
+                position: "insideLeft",
+                offset: 10,
+              }}
+            />
+            <ReferenceLine
+              y={5}
+              stroke="green"
+              strokeDasharray="5 5"
+              label={{
+                value: "Optimal 5",
                 position: "insideLeft",
                 offset: 10,
               }}
             />
 
-            {/* Line chart for glucose data */}
             <Line
               type="monotone"
-              dataKey="glucose"
-              name="Glucose (mg/dL)"
+              dataKey="hba1c"
+              name="HbA1c (%)"
               stroke="#8884d8"
               strokeWidth={2}
               activeDot={{ r: 6 }}
               connectNulls={true}
             />
 
-            {/* Scatter plot for events */}
             <Scatter
               dataKey="eventValue"
               name="Events"

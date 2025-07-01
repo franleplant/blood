@@ -168,7 +168,6 @@ export default function TriglyceridesHDLRatioChartClient({
           name="Triglycerides/HDL Ratio"
           stroke="#8884d8"
           strokeWidth={2}
-          dot={false}
           activeDot={{ r: 8 }}
           connectNulls={true}
         />
