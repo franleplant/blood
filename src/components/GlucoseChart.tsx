@@ -2,14 +2,10 @@ import GlucoseChartClient from "@/components/GlucoseChartClient";
 import { openDatabase } from "@/lib/db";
 import normalizeGlucose from "@/lib/normalize_glucose_units";
 import { labResultsRowSchema } from "@/lib/schemas/labResultsRow";
-import sqlite3 from "sqlite3";
 import { z } from "zod";
 
 async function getGlucoseData() {
-  const { db } = await openDatabase({
-    filename: "./blood_markers.sqlite",
-    driver: sqlite3.Database,
-  });
+  const { db } = await openDatabase();
 
   const query = `
     SELECT * FROM lab_results

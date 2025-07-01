@@ -1,7 +1,6 @@
 import { openDatabase } from "@/lib/db";
 import normalizeGlucose from "@/lib/normalize_glucose_units";
 import { labResultsRowSchema } from "@/lib/schemas/labResultsRow";
-import sqlite3 from "sqlite3";
 import { z } from "zod";
 import HomaIRChartClient from "./HomaIRChartClient";
 
@@ -16,10 +15,7 @@ const homaIRQueryRowSchema = z.object({
 });
 
 async function getHomaIRData() {
-  const { db } = await openDatabase({
-    filename: "./blood_markers.sqlite",
-    driver: sqlite3.Database,
-  });
+  const { db } = await openDatabase();
 
   const query = `
     SELECT
