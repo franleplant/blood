@@ -2,11 +2,12 @@
 
 import {
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
-  LineChart,
   ReferenceLine,
   ResponsiveContainer,
+  Scatter,
   Tooltip,
   XAxis,
   YAxis,
@@ -23,6 +24,14 @@ interface EventDataPoint {
   description: string;
 }
 
+interface ChartDataPoint {
+  date: number;
+  glucose?: number;
+  eventValue?: number;
+  eventTitle?: string;
+  eventDescription?: string;
+}
+
 export default function GlucoseChartClient({
   data,
   events,
@@ -30,12 +39,35 @@ export default function GlucoseChartClient({
   data: GlucoseDataPoint[];
   events: EventDataPoint[];
 }) {
+  // Filter events for medication events
+  const medicationEvents = events.filter(
+    (e) =>
+      e.title.toLowerCase().includes("metofirm") ||
+      e.title.toLowerCase().includes("ozempic")
+  );
+
+  // Combine glucose data and events into a single dataset
+  const chartData: ChartDataPoint[] = [
+    // Add glucose data points
+    ...data.map((point) => ({
+      date: point.date,
+      glucose: point.value,
+    })),
+    // Add event data points (positioned at a fixed glucose level for visibility)
+    ...medicationEvents.map((event) => ({
+      date: event.date.getTime(),
+      eventValue: 50, // Fixed position for events on the chart
+      eventTitle: event.title,
+      eventDescription: event.description,
+    })),
+  ].sort((a, b) => a.date - b.date);
+
   return (
     <div className="space-y-6">
       <div>
         <ResponsiveContainer width="100%" height={400}>
-          <LineChart
-            data={data}
+          <ComposedChart
+            data={chartData}
             margin={{
               top: 20,
               right: 30,
@@ -45,6 +77,7 @@ export default function GlucoseChartClient({
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
+              padding={{ left: 10, right: 10 }}
               dataKey="date"
               type="number"
               scale="time"
@@ -53,17 +86,49 @@ export default function GlucoseChartClient({
                 new Date(unixTime).toLocaleDateString()
               }
             />
-            <YAxis
-              domain={[
-                "dataMin - 5",
-                (dataMax: number) => Math.max(dataMax + 5, 140),
-              ]}
-            />
+            <YAxis domain={["dataMin", "dataMax + 10"]} />
             <Tooltip
               labelFormatter={(label) => new Date(label).toLocaleDateString()}
-              formatter={(value: number) => [`${value} mg/dL`, "Glucose"]}
+              formatter={(value: number, name: string) => {
+                if (name === "Glucose") {
+                  return [`${value} mg/dL`, "Glucose"];
+                }
+                return [value, name];
+              }}
+              content={({ active, payload, label }) => {
+                if (active && payload && payload.length) {
+                  return (
+                    <div className="bg-white p-2 border rounded shadow">
+                      <p className="font-semibold">
+                        {new Date(label as number).toLocaleDateString()}
+                      </p>
+                      {payload.map((entry, index) => {
+                        if (entry.dataKey === "glucose" && entry.value) {
+                          return (
+                            <p key={index} style={{ color: entry.color }}>
+                              Glucose: {entry.value} mg/dL
+                            </p>
+                          );
+                        }
+                        if (entry.dataKey === "eventValue" && entry.payload) {
+                          const data = entry.payload as ChartDataPoint;
+                          return (
+                            <div key={index} style={{ color: entry.color }}>
+                              <p className="font-semibold">{data.eventTitle}</p>
+                              <p className="text-sm">{data.eventDescription}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  );
+                }
+                return null;
+              }}
             />
             <Legend />
+
             {/* Reference Lines for Glucose Ranges */}
             <ReferenceLine
               y={70}
@@ -85,57 +150,30 @@ export default function GlucoseChartClient({
                 offset: 10,
               }}
             />
-            {/* <ReferenceLine
-              y={126}
-              stroke="#red"
-              strokeDasharray="5 5"
-              label="Diabetes (126)"
-            /> */}
-            {/* Event Reference Lines */}
-            {events
-              .map((e) => {
-                console.log(
-                  e.title.toLowerCase(),
-                  e.title.toLowerCase().includes("ozempic")
-                );
-                return e;
-              })
-              .filter(
-                (e) =>
-                  e.title.toLowerCase().includes("metofirm") ||
-                  e.title.toLowerCase().includes("ozempic")
-              )
-              .map((e) => {
-                console.log(">>>", e.title.toLowerCase(), e);
-                return e;
-              })
-              .map((event, index) => (
-                <ReferenceLine
-                  key={index}
-                  x={event.date.getTime()}
-                  stroke="#ff7300"
-                  strokeDasharray="5 5"
-                  label={{
-                    // angle: 90,
-                    value: event.title,
-                    position: "top",
-                    offset: 10,
-                    style: {
-                      fontSize: "12px",
-                      fill: "#ff7300",
-                      fontWeight: "bold",
-                    },
-                  }}
-                />
-              ))}
+
+            {/* Line chart for glucose data */}
             <Line
               type="monotone"
-              dataKey="value"
+              dataKey="glucose"
               name="Glucose (mg/dL)"
               stroke="#8884d8"
-              activeDot={{ r: 8 }}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 6 }}
+              connectNulls={true}
             />
-          </LineChart>
+
+            {/* Scatter plot for events */}
+            <Scatter
+              dataKey="eventValue"
+              name="Events"
+              fill="#ff7300"
+              shape="diamond"
+              fontSize={10}
+              // strokeWidth={10}
+              // radius={20}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
     </div>
