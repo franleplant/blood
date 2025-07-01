@@ -169,9 +169,6 @@ export default function GlucoseChartClient({
               name="Events"
               fill="#ff7300"
               shape="diamond"
-              fontSize={10}
-              // strokeWidth={10}
-              // radius={20}
             />
           </ComposedChart>
         </ResponsiveContainer>
