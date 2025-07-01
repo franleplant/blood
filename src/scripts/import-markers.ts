@@ -17,9 +17,21 @@ const dbFilePath = path.resolve(__dirname, "../../blood_markers.sqlite");
 const tableName = "lab_results"; // Define final table name
 const tempTableName = "temp_lab_results"; // Define temporary table name
 
+// Get user_id from environment variable, default to 1
+const USER_ID = process.env.USER_ID ? parseInt(process.env.USER_ID) : 1;
+
+// Validate USER_ID
+if (isNaN(USER_ID) || USER_ID < 1) {
+  console.error(
+    `❌ Invalid USER_ID: ${process.env.USER_ID}. Must be a positive integer.`
+  );
+  process.exit(1);
+}
+
 async function main() {
   console.log(`Using CSV file: ${csvFilePath}`);
   console.log(`Using DB file: ${dbFilePath}`);
+  console.log(`Assigning all markers to user_id: ${USER_ID}`);
 
   let db: sqlite.Database | undefined;
 
@@ -112,10 +124,12 @@ async function main() {
     });
     console.log("Connected to database for data transfer.");
 
-    const copyDataQuery = `INSERT INTO "${tableName}" (${sqlColumnNamesOnly})
-SELECT ${sqlColumnNamesOnly}
+    const copyDataQuery = `INSERT INTO "${tableName}" (${sqlColumnNamesOnly}, user_id)
+SELECT ${sqlColumnNamesOnly}, ${USER_ID}
 FROM "${tempTableName}";`;
-    console.log(`Copying data from "${tempTableName}" to "${tableName}"...`);
+    console.log(
+      `Copying data from "${tempTableName}" to "${tableName}" with user_id ${USER_ID}...`
+    );
     await db.run(copyDataQuery);
     console.log("Data copied successfully to final table.");
 
@@ -131,7 +145,7 @@ FROM "${tempTableName}";`;
     console.log(
       `Verification: Final table "${tableName}" now contains ${
         rowCountResult?.count || 0
-      } rows.`
+      } rows, all assigned to user_id ${USER_ID}.`
     );
 
     await db.close();
