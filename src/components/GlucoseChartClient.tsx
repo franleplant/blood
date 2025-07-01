@@ -99,8 +99,9 @@ export default function GlucoseChartClient({
                 stroke="#ff7300"
                 strokeDasharray="5 5"
                 label={{
+                  angle: 90,
                   value: event.title,
-                  position: "top",
+                  position: "insideTop",
                   offset: 10,
                   style: {
                     fontSize: "12px",
