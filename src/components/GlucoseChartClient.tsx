@@ -67,9 +67,13 @@ export default function GlucoseChartClient({
             {/* Reference Lines for Glucose Ranges */}
             <ReferenceLine
               y={70}
-              stroke="#orange"
+              stroke="orange"
               strokeDasharray="5 5"
-              label="Low (70)"
+              label={{
+                value: "Low (70)",
+                position: "insideLeft",
+                offset: 10,
+              }}
             />
             <ReferenceLine
               y={100}

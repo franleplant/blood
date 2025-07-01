@@ -62,7 +62,16 @@ export default function HomaIRChartClient({
           formatter={(value: number) => value.toFixed(2)}
         />
         <Legend />
-        <ReferenceLine y={2} stroke="red" label="2" />
+        <ReferenceLine
+          y={2}
+          stroke="red"
+          strokeDasharray="5 5"
+          label={{
+            value: "Insulin Resistance (2.0)",
+            position: "insideLeft",
+            offset: 10,
+          }}
+        />
         {events.map((event, index) => (
           <ReferenceLine
             key={index}
