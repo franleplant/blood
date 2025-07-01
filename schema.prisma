@@ -24,3 +24,12 @@ model LabResult {
 
   @@map("lab_results")
 }
+
+model Event {
+  id          Int    @id @default(autoincrement())
+  date        String // Required field
+  title       String // Required field
+  description String // Required field
+
+  @@map("events")
+}
