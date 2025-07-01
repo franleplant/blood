@@ -1,27 +1,44 @@
 import GlucoseChart from "@/components/GlucoseChart";
 import HomaIRChart from "@/components/HomaIRChart";
 import MarkersTable from "@/components/MarkersTable";
+import TriglyceridesHDLRatioChart from "@/components/TriglyceridesHDLRatioChart";
 
 export default async function Home() {
+  const userId = 1; // Example user ID
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <h1 className="text-4xl font-bold text-center">Blood Markers</h1>
+    <main className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl">
+          Health Markers Dashboard
+        </h1>
+        <p className="mt-4 text-lg text-muted-foreground">
+          Visualizing key health indicators over time.
+        </p>
       </div>
 
-      <div className="w-full max-w-5xl mt-8">
-        <h2 className="text-2xl font-bold text-center my-4">Fasting Glucose</h2>
-        <GlucoseChart userId={1} />
-      </div>
+      <div className="space-y-12">
+        <div className="space-y-8">
+          <div className="p-4 border rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Glucose</h2>
+            <GlucoseChart userId={userId} />
+          </div>
+          <div className="p-4 border rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">HOMA-IR</h2>
+            <HomaIRChart userId={userId} />
+          </div>
+          <div className="p-4 border rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">
+              Triglycerides/HDL Ratio
+            </h2>
+            <TriglyceridesHDLRatioChart userId={userId} />
+          </div>
+        </div>
 
-      <div className="w-full max-w-5xl mt-8">
-        <h2 className="text-2xl font-bold text-center my-4">HOMA-IR</h2>
-        <HomaIRChart userId={1} />
-      </div>
-
-      <div className="w-full max-w-5xl mt-8">
-        <h2 className="text-2xl font-bold text-center my-4">All Markers</h2>
-        <MarkersTable userId={1} />
+        <div>
+          <h2 className="text-2xl font-bold text-center my-8">All Markers</h2>
+          <MarkersTable userId={userId} />
+        </div>
       </div>
     </main>
   );
