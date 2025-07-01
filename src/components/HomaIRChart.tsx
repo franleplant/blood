@@ -86,8 +86,31 @@ async function getHomaIRData(userId: number) {
   return homaIRDataPoints;
 }
 
+async function getEventsData(userId: number) {
+  const { prisma } = await openDatabase();
+
+  const events = await prisma.event.findMany({
+    where: {
+      user_id: userId,
+    },
+    orderBy: {
+      date: "asc",
+    },
+  });
+
+  return events.map((event) => ({
+    date: new Date(event.date),
+    title: event.title,
+    description: event.description,
+  }));
+}
+
 export default async function HomaIRChart({ userId }: Props) {
-  const data = await getHomaIRData(userId);
+  const [data, events] = await Promise.all([
+    getHomaIRData(userId),
+    getEventsData(userId),
+  ]);
+
   if (data.length === 0) {
     return (
       <div className="w-full text-center p-4">
@@ -96,5 +119,5 @@ export default async function HomaIRChart({ userId }: Props) {
       </div>
     );
   }
-  return <HomaIRChartClient data={data} />;
+  return <HomaIRChartClient data={data} events={events} />;
 }

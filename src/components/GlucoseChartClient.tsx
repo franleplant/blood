@@ -17,10 +17,18 @@ interface GlucoseDataPoint {
   value: number;
 }
 
+interface EventDataPoint {
+  date: Date;
+  title: string;
+  description: string;
+}
+
 export default function GlucoseChartClient({
   data,
+  events,
 }: {
   data: GlucoseDataPoint[];
+  events: EventDataPoint[];
 }) {
   return (
     <ResponsiveContainer width="100%" height={400}>
@@ -52,6 +60,23 @@ export default function GlucoseChartClient({
         />
         <Legend />
         <ReferenceLine y={100} stroke="red" label="100" />
+        {events.map((event, index) => (
+          <ReferenceLine
+            key={index}
+            x={event.date.getTime()}
+            stroke="#ff7300"
+            strokeDasharray="5 5"
+            label={{
+              value: event.title,
+              offset: 10,
+              style: {
+                fontSize: "12px",
+                fill: "#ff7300",
+                fontWeight: "bold",
+              },
+            }}
+          />
+        ))}
         <Line
           type="monotone"
           dataKey="value"

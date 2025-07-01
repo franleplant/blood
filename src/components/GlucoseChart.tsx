@@ -43,13 +43,35 @@ async function getGlucoseData(userId: number) {
   return glucoseDataPoints;
 }
 
+async function getEventsData(userId: number) {
+  const { prisma } = await openDatabase();
+
+  const events = await prisma.event.findMany({
+    where: {
+      user_id: userId,
+    },
+    orderBy: {
+      date: "asc",
+    },
+  });
+
+  return events.map((event) => ({
+    date: new Date(event.date),
+    title: event.title,
+    description: event.description,
+  }));
+}
+
 export default async function GlucoseChart({ userId }: Props) {
-  const data = await getGlucoseData(userId);
+  const [data, events] = await Promise.all([
+    getGlucoseData(userId),
+    getEventsData(userId),
+  ]);
 
   if (data.length === 0) {
     return (
       <div className="w-full text-center p-4">No glucose data to display.</div>
     );
   }
-  return <GlucoseChartClient data={data} />;
+  return <GlucoseChartClient data={data} events={events} />;
 }

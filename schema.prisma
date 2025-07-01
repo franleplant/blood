@@ -43,8 +43,8 @@ model LabResult {
 }
 
 model Event {
-  id          Int    @id @default(autoincrement())
-  date        String // Required field
+  id          Int      @id @default(autoincrement())
+  date        DateTime // Required field
   title       String // Required field
   description String // Required field
 

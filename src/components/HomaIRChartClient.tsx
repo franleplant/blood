@@ -17,10 +17,18 @@ interface HomaIRDataPoint {
   homaIR: number;
 }
 
+interface EventDataPoint {
+  date: Date;
+  title: string;
+  description: string;
+}
+
 export default function HomaIRChartClient({
   data,
+  events,
 }: {
   data: HomaIRDataPoint[];
+  events: EventDataPoint[];
 }) {
   const chartData = data.map((point) => ({
     date: point.date.getTime(),
@@ -55,6 +63,23 @@ export default function HomaIRChartClient({
         />
         <Legend />
         <ReferenceLine y={2} stroke="red" label="2" />
+        {events.map((event, index) => (
+          <ReferenceLine
+            key={index}
+            x={event.date.getTime()}
+            stroke="#ff7300"
+            strokeDasharray="5 5"
+            label={{
+              value: event.title,
+              offset: 10,
+              style: {
+                fontSize: "12px",
+                fill: "#ff7300",
+                fontWeight: "bold",
+              },
+            }}
+          />
+        ))}
         <Line
           type="monotone"
           dataKey="HOMA-IR"
