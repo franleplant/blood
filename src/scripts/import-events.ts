@@ -8,7 +8,7 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const csvFilePath = path.resolve(__dirname, "../events.csv");
+const csvFilePath = path.resolve(__dirname, "../../events.csv");
 const dbFilePath = path.resolve(__dirname, "../../blood_markers.sqlite");
 const tableName = "events";
 
