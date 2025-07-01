@@ -92,25 +92,42 @@ export default function GlucoseChartClient({
               label="Diabetes (126)"
             /> */}
             {/* Event Reference Lines */}
-            {events.map((event, index) => (
-              <ReferenceLine
-                key={index}
-                x={event.date.getTime()}
-                stroke="#ff7300"
-                strokeDasharray="5 5"
-                label={{
-                  angle: 90,
-                  value: event.title,
-                  position: "insideTop",
-                  offset: 10,
-                  style: {
-                    fontSize: "12px",
-                    fill: "#ff7300",
-                    fontWeight: "bold",
-                  },
-                }}
-              />
-            ))}
+            {events
+              .map((e) => {
+                console.log(
+                  e.title.toLowerCase(),
+                  e.title.toLowerCase().includes("ozempic")
+                );
+                return e;
+              })
+              .filter(
+                (e) =>
+                  e.title.toLowerCase().includes("metofirm") ||
+                  e.title.toLowerCase().includes("ozempic")
+              )
+              .map((e) => {
+                console.log(">>>", e.title.toLowerCase(), e);
+                return e;
+              })
+              .map((event, index) => (
+                <ReferenceLine
+                  key={index}
+                  x={event.date.getTime()}
+                  stroke="#ff7300"
+                  strokeDasharray="5 5"
+                  label={{
+                    // angle: 90,
+                    value: event.title,
+                    position: "top",
+                    offset: 10,
+                    style: {
+                      fontSize: "12px",
+                      fill: "#ff7300",
+                      fontWeight: "bold",
+                    },
+                  }}
+                />
+              ))}
             <Line
               type="monotone"
               dataKey="value"
