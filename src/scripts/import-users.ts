@@ -7,7 +7,7 @@ import { openDatabase } from "../lib/db";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const csvFilePath = path.resolve(__dirname, "users.csv");
+const csvFilePath = path.resolve(__dirname, "../users.csv");
 
 interface UserCSVRow {
   id: string;
