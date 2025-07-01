@@ -1,132 +1,58 @@
-import { parse } from "csv-parse";
-import fs from "fs/promises";
+import { exec } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
-import { openDatabase } from "../lib/db";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const csvFilePath = path.resolve(__dirname, "../events.csv");
-
-interface EventCSVRow {
-  id: string;
-  date: string;
-  title: string;
-  description: string;
-  user_id: string;
-}
+const dbFilePath = path.resolve(__dirname, "../../blood_markers.sqlite");
+const tableName = "events";
 
 async function main() {
   console.log("🔄 Starting event import from CSV...");
-  console.log(`📁 Reading CSV file: ${csvFilePath}`);
-
-  const { prisma } = await openDatabase();
+  console.log(`📁 Using CSV file: ${csvFilePath}`);
+  console.log(`📁 Using DB file: ${dbFilePath}`);
 
   try {
-    // Read and parse CSV file
-    const fileContent = await fs.readFile(csvFilePath, { encoding: "utf-8" });
+    // Import data directly into events table using sqlite3 CLI
+    console.log(`Importing data into "${tableName}" table via CLI...`);
 
-    const records: EventCSVRow[] = await new Promise((resolve, reject) => {
-      parse(
-        fileContent,
-        {
-          columns: true, // Use first row as column headers
-          skip_empty_lines: true,
-          trim: true,
-        },
-        (err, parsedRecords) => {
-          if (err) reject(err);
-          else resolve(parsedRecords);
-        }
+    // Escape paths for shell command
+    const escapedDbFilePath = dbFilePath.replace(/ /g, "\\\\ ");
+    const escapedCsvFilePath = csvFilePath.replace(/ /g, "\\\\ ");
+
+    const importCommand = `sqlite3 --csv "${escapedDbFilePath}" ".import --skip 1 '${escapedCsvFilePath}' ${tableName}"`;
+    console.log(`Executing CLI command: ${importCommand}`);
+
+    const { stdout: importStdout, stderr: importStderr } = await execAsync(
+      importCommand
+    );
+
+    if (importStderr) {
+      console.warn(
+        "sqlite3 CLI stderr (may contain info or errors):",
+        importStderr
       );
-    });
-
-    console.log(`📊 Found ${records.length} events to import`);
-
-    if (records.length === 0) {
-      console.log("⚠️  No events found in CSV file");
-      return;
+    }
+    if (importStdout) {
+      console.log("sqlite3 CLI stdout:", importStdout);
     }
 
-    // Show preview of data
-    console.log("\n📋 Preview of events to import:");
-    records.forEach((event, index) => {
-      console.log(`${index + 1}. ${event.title}`);
-      console.log(`   ID: ${event.id}`);
-      console.log(`   Date: ${event.date}`);
-      console.log(`   Description: ${event.description || "(empty)"}`);
-      console.log(`   User ID: ${event.user_id}`);
-      console.log();
-    });
-
-    let createdCount = 0;
-    let updatedCount = 0;
-
-    for (const eventRow of records) {
-      const eventId = parseInt(eventRow.id);
-      const userId = parseInt(eventRow.user_id);
-
-      // Check if user exists
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!user) {
-        console.log(
-          `⚠️  User with ID ${userId} not found. Skipping event: ${eventRow.title}`
-        );
-        continue;
-      }
-
-      // Check if event already exists
-      const existingEvent = await prisma.event.findUnique({
-        where: { id: eventId },
-      });
-
-      if (existingEvent) {
-        // Update existing event
-        await prisma.event.update({
-          where: { id: eventId },
-          data: {
-            date: eventRow.date,
-            title: eventRow.title,
-            description: eventRow.description,
-            user_id: userId,
-          },
-        });
-        console.log(`✅ Updated event: ${eventRow.title} (ID: ${eventId})`);
-        updatedCount++;
-      } else {
-        // Create new event
-        await prisma.event.create({
-          data: {
-            id: eventId,
-            date: eventRow.date,
-            title: eventRow.title,
-            description: eventRow.description,
-            user_id: userId,
-          },
-        });
-        console.log(`✅ Created event: ${eventRow.title} (ID: ${eventId})`);
-        createdCount++;
-      }
-    }
+    // Verify import by counting rows
+    console.log(`Verifying import into "${tableName}" table...`);
+    const countCommand = `sqlite3 "${escapedDbFilePath}" "SELECT COUNT(*) FROM ${tableName};"`;
+    const { stdout: countStdout } = await execAsync(countCommand);
+    const totalEvents = parseInt(countStdout.trim());
 
     console.log(`\n🎉 Import completed successfully!`);
-    console.log(`📊 Summary:`);
-    console.log(`   - Created: ${createdCount} events`);
-    console.log(`   - Updated: ${updatedCount} events`);
-    console.log(`   - Total processed: ${createdCount + updatedCount} events`);
-
-    // Verify import by counting total events
-    const totalEvents = await prisma.event.count();
-    console.log(`\n📈 Total events in database: ${totalEvents}`);
+    console.log(`📈 Total events in database: ${totalEvents}`);
   } catch (error) {
     console.error("❌ Error during event import:", error);
     process.exit(1);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
