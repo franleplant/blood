@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "db:init": "tsx scripts/import-csv.ts",
+    "db:import-csv": "tsx src/scripts/import-csv.ts",
     "db:normalize-decimals": "tsx src/scripts/normalize-decimal-separators.ts",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
@@ -53,6 +53,7 @@
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^2.12.7",
+    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "tailwind-merge": "^2.6.0",
     "tailwindcss": "^4",

@@ -12,8 +12,8 @@ const execAsync = promisify(exec); // Promisify exec
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const csvFilePath = path.resolve(__dirname, "../historiclabdata.csv");
-const dbFilePath = path.resolve(__dirname, "../blood_markers.sqlite");
+const csvFilePath = path.resolve(__dirname, "../../historiclabdata.csv");
+const dbFilePath = path.resolve(__dirname, "../../blood_markers.sqlite");
 const tableName = "lab_results"; // Define final table name
 const tempTableName = "temp_lab_results"; // Define temporary table name
 
@@ -67,15 +67,6 @@ async function main() {
       .map((name) => `"${name}"`)
       .join(", ");
 
-    // Create final table (tableName)
-    await db.exec(`DROP TABLE IF EXISTS "${tableName}";`);
-    const createFinalTableQuery = `CREATE TABLE "${tableName}" (
-  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-${sqlColumnDefinitions}
-);`;
-    await db.exec(createFinalTableQuery);
-    console.log(`Final table "${tableName}" created.`);
-
     // Create temporary table (tempTableName)
     await db.exec(`DROP TABLE IF EXISTS "${tempTableName}";`);
     // Temporary table columns are the same, just without the ID
@@ -84,7 +75,6 @@ ${sqlColumnDefinitions}
     console.log(`Temporary table "${tempTableName}" created.`);
 
     await db.close();
-    db = undefined;
     console.log("Database connection closed after initial table setup.");
 
     // Step 3: Import data into Temporary Table using sqlite3 CLI
