@@ -2,11 +2,12 @@
 
 import {
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
-  LineChart,
   ReferenceLine,
   ResponsiveContainer,
+  Scatter,
   Tooltip,
   XAxis,
   YAxis,
@@ -23,6 +24,14 @@ interface EventDataPoint {
   description: string;
 }
 
+interface ChartDataPoint {
+  date: number;
+  homaIR?: number;
+  eventValue?: number;
+  eventTitle?: string;
+  eventDescription?: string;
+}
+
 export default function HomaIRChartClient({
   data,
   events,
@@ -30,14 +39,32 @@ export default function HomaIRChartClient({
   data: HomaIRDataPoint[];
   events: EventDataPoint[];
 }) {
-  const chartData = data.map((point) => ({
-    date: point.date.getTime(),
-    "HOMA-IR": point.homaIR,
-  }));
+  // Filter events for medication events
+  const medicationEvents = events.filter(
+    (e) =>
+      e.title.toLowerCase().includes("metofirm") ||
+      e.title.toLowerCase().includes("ozempic")
+  );
+
+  // Combine HOMA-IR data and events into a single dataset
+  const chartData: ChartDataPoint[] = [
+    // Add HOMA-IR data points
+    ...data.map((point) => ({
+      date: point.date.getTime(),
+      homaIR: point.homaIR,
+    })),
+    // Add event data points (positioned at a fixed HOMA-IR level for visibility)
+    ...medicationEvents.map((event) => ({
+      date: event.date.getTime(),
+      eventValue: 0.5, // Fixed position for events on the chart
+      eventTitle: event.title,
+      eventDescription: event.description,
+    })),
+  ].sort((a, b) => a.date - b.date);
 
   return (
     <ResponsiveContainer width="100%" height={400}>
-      <LineChart
+      <ComposedChart
         data={chartData}
         margin={{
           top: 20,
@@ -48,6 +75,7 @@ export default function HomaIRChartClient({
       >
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis
+          padding={{ left: 10, right: 10 }}
           dataKey="date"
           type="number"
           scale="time"
@@ -59,7 +87,37 @@ export default function HomaIRChartClient({
         />
         <Tooltip
           labelFormatter={(label) => new Date(label).toLocaleDateString()}
-          formatter={(value: number) => value.toFixed(2)}
+          content={({ active, payload, label }) => {
+            if (active && payload && payload.length) {
+              return (
+                <div className="bg-white p-2 border rounded shadow">
+                  <p className="font-semibold">
+                    {new Date(label as number).toLocaleDateString()}
+                  </p>
+                  {payload.map((entry, index) => {
+                    if (entry.dataKey === "homaIR" && entry.value) {
+                      return (
+                        <p key={index} style={{ color: entry.color }}>
+                          HOMA-IR: {(entry.value as number).toFixed(2)}
+                        </p>
+                      );
+                    }
+                    if (entry.dataKey === "eventValue" && entry.payload) {
+                      const data = entry.payload as ChartDataPoint;
+                      return (
+                        <div key={index} style={{ color: entry.color }}>
+                          <p className="font-semibold">{data.eventTitle}</p>
+                          <p className="text-sm">{data.eventDescription}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              );
+            }
+            return null;
+          }}
         />
         <Legend />
         <ReferenceLine
@@ -72,31 +130,27 @@ export default function HomaIRChartClient({
             offset: 10,
           }}
         />
-        {events.map((event, index) => (
-          <ReferenceLine
-            key={index}
-            x={event.date.getTime()}
-            stroke="#ff7300"
-            strokeDasharray="5 5"
-            label={{
-              value: event.title,
-              offset: 10,
-              position: "top",
-              style: {
-                fontSize: "12px",
-                fill: "#ff7300",
-                fontWeight: "bold",
-              },
-            }}
-          />
-        ))}
+
+        {/* Line chart for HOMA-IR data */}
         <Line
           type="monotone"
-          dataKey="HOMA-IR"
+          dataKey="homaIR"
+          name="HOMA-IR"
           stroke="#82ca9d"
+          strokeWidth={2}
+          dot={false}
           activeDot={{ r: 8 }}
+          connectNulls={true}
         />
-      </LineChart>
+
+        {/* Scatter plot for events */}
+        <Scatter
+          dataKey="eventValue"
+          name="Events"
+          fill="#ff7300"
+          shape="diamond"
+        />
+      </ComposedChart>
     </ResponsiveContainer>
   );
 }
