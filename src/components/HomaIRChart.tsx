@@ -1,54 +1,43 @@
 import { openDatabase } from "@/lib/db";
 import normalizeGlucose from "@/lib/normalize_glucose_units";
-import { labResultsRowSchema } from "@/lib/schemas/labResultsRow";
-import { z } from "zod";
 import HomaIRChartClient from "./HomaIRChartClient";
 
 const HOMA_IR_DIVISOR = 405;
 
-const homaIRQueryRowSchema = z.object({
-  date: z.coerce.date(),
-  glucose_value: labResultsRowSchema.shape.value,
-  glucose_unit: z.string(),
-  insulin_value: labResultsRowSchema.shape.value,
-  insulin_unit: z.string().nullable(),
-});
-
 async function getHomaIRData() {
-  const { db } = await openDatabase();
+  const { prisma } = await openDatabase();
 
-  const query = `
+  const results = await prisma.$queryRaw<
+    Array<{
+      date: string;
+      glucose_value: number;
+      glucose_unit: string;
+      insulin_value: number;
+      insulin_unit: string | null;
+    }>
+  >`
     SELECT
-    g.date,
-    g.value AS glucose_value,
-    g.unit AS glucose_unit,
-    i.value AS insulin_value,
-    i.unit AS insulin_unit
+      g.date,
+      g.value AS glucose_value,
+      g.unit AS glucose_unit,
+      i.value AS insulin_value,
+      i.unit AS insulin_unit
     FROM (
-    SELECT date, value, unit, marker_name_en FROM lab_results
-    WHERE LOWER(marker_name_en) LIKE '%glucose%'
+      SELECT date, value, unit, marker_name_en FROM lab_results 
+      WHERE LOWER(marker_name_en) LIKE '%glucose%'
         AND LOWER(marker_name_en) NOT LIKE '%minutes%'
         AND unit IS NOT NULL AND TRIM(unit) <> ''
     ) AS g
     JOIN (
-    SELECT date, value, unit, marker_name_en FROM lab_results
-    WHERE LOWER(marker_name_en) LIKE '%insulin%'
+      SELECT date, value, unit, marker_name_en FROM lab_results
+      WHERE LOWER(marker_name_en) LIKE '%insulin%'
         AND LOWER(marker_name_en) NOT LIKE '%minutes%'
         AND unit IS NOT NULL AND TRIM(unit) <> ''
     ) AS i
     ON g.date = i.date
-    ORDER BY g.date ASC;
-`;
-
-  const results = await db.all(query);
-  const parsedResults = z.array(homaIRQueryRowSchema).safeParse(results);
-
-  if (!parsedResults.success) {
-    console.error("Error parsing HOMA-IR data:", parsedResults.error);
-    return [];
-  }
-
-  const homaIRDataPoints = parsedResults.data
+    ORDER BY g.date ASC
+  `;
+  const homaIRDataPoints = results
     .map((row) => {
       try {
         const correctInsulinUnit = "µUI/ml";
@@ -76,7 +65,7 @@ async function getHomaIRData() {
         }
         const homaIR = (glucoseValMgDl * insulinValMicroUML) / HOMA_IR_DIVISOR;
 
-        return { date: row.date, homaIR };
+        return { date: new Date(row.date), homaIR };
       } catch (error) {
         console.error(
           `Error processing row (Date: ${row.date}): ${

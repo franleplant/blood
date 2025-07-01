@@ -1,35 +1,36 @@
 import GlucoseChartClient from "@/components/GlucoseChartClient";
 import { openDatabase } from "@/lib/db";
 import normalizeGlucose from "@/lib/normalize_glucose_units";
-import { labResultsRowSchema } from "@/lib/schemas/labResultsRow";
-import { z } from "zod";
 
 async function getGlucoseData() {
-  const { db } = await openDatabase();
+  const { prisma } = await openDatabase();
 
-  const query = `
-    SELECT * FROM lab_results
-    WHERE LOWER(marker_name_en) LIKE '%glucose%'
-      AND LOWER(marker_name_en) NOT LIKE '%minutes%'
-      AND unit IS NOT NULL
-      AND TRIM(unit) <> '';
-  `;
+  const results = await prisma.labResult.findMany({
+    where: {
+      marker_name_en: {
+        contains: "glucose",
+      },
+      NOT: {
+        marker_name_en: {
+          contains: "minutes",
+        },
+      },
+      unit: {
+        not: "",
+      },
+    },
+    orderBy: {
+      date: "asc",
+    },
+  });
 
-  const results = await db.all(query);
-  const parsedResults = z.array(labResultsRowSchema).safeParse(results);
-
-  if (!parsedResults.success) {
-    console.error("Error parsing glucose data:", parsedResults.error);
-    return [];
-  }
-
-  const glucoseDataPoints = parsedResults.data.map((row) => {
+  const glucoseDataPoints = results.map((row) => {
     const normalized = normalizeGlucose({
       value: String(row.value),
       unit: row.unit ?? "",
     });
     return {
-      date: row.date.getTime(),
+      date: new Date(row.date).getTime(),
       value: parseFloat(normalized.value),
     };
   });
