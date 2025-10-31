@@ -4,6 +4,7 @@ import normalizeUnits from "@/lib/normalize_units";
 
 interface Props {
   userId: number;
+  dateRange?: { min: number; max: number };
 }
 
 async function getLiverEnzymeData(userId: number) {
@@ -60,7 +61,7 @@ async function getLiverEnzymeData(userId: number) {
   return Object.values(dateMap).sort((a, b) => a.date - b.date);
 }
 
-export default async function LiverEnzymesChart({ userId }: Props) {
+export default async function LiverEnzymesChart({ userId, dateRange }: Props) {
   const data = await getLiverEnzymeData(userId);
 
   if (data.length === 0) {
@@ -70,5 +71,5 @@ export default async function LiverEnzymesChart({ userId }: Props) {
       </div>
     );
   }
-  return <LiverEnzymesChartClient data={data} />;
+  return <LiverEnzymesChartClient data={data} dateRange={dateRange} />;
 }

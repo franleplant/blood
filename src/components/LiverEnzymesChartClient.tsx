@@ -21,8 +21,10 @@ interface LiverEnzymeDataPoint {
 
 export default function LiverEnzymesChartClient({
   data,
+  dateRange,
 }: {
   data: LiverEnzymeDataPoint[];
+  dateRange?: { min: number; max: number };
 }) {
   return (
     <div className="space-y-6">
@@ -43,7 +45,11 @@ export default function LiverEnzymesChartClient({
               dataKey="date"
               type="number"
               scale="time"
-              domain={["dataMin", "dataMax"]}
+              domain={
+                dateRange
+                  ? [dateRange.min, dateRange.max]
+                  : ["dataMin", "dataMax"]
+              }
               tickFormatter={(unixTime) =>
                 new Date(unixTime).toLocaleDateString()
               }

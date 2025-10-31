@@ -4,6 +4,7 @@ import normalizeGlucose from "@/lib/normalize_glucose_units";
 
 interface Props {
   userId: number;
+  dateRange?: { min: number; max: number };
 }
 
 async function getGlucoseData(userId: number) {
@@ -62,7 +63,7 @@ async function getEventsData(userId: number) {
   }));
 }
 
-export default async function GlucoseChart({ userId }: Props) {
+export default async function GlucoseChart({ userId, dateRange }: Props) {
   const [data, events] = await Promise.all([
     getGlucoseData(userId),
     getEventsData(userId),
@@ -73,5 +74,7 @@ export default async function GlucoseChart({ userId }: Props) {
       <div className="w-full text-center p-4">No glucose data to display.</div>
     );
   }
-  return <GlucoseChartClient data={data} events={events} />;
+  return (
+    <GlucoseChartClient data={data} events={events} dateRange={dateRange} />
+  );
 }

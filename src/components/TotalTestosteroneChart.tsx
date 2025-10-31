@@ -4,6 +4,7 @@ import normalizeTestosterone from "@/lib/normalize_testosterone";
 
 interface Props {
   userId: number;
+  dateRange?: { min: number; max: number };
 }
 
 async function getTotalTestosteroneData(userId: number) {
@@ -70,7 +71,10 @@ async function getEventsData(userId: number) {
   }));
 }
 
-export default async function TotalTestosteroneChart({ userId }: Props) {
+export default async function TotalTestosteroneChart({
+  userId,
+  dateRange,
+}: Props) {
   const [data, events] = await Promise.all([
     getTotalTestosteroneData(userId),
     getEventsData(userId),
@@ -83,5 +87,11 @@ export default async function TotalTestosteroneChart({ userId }: Props) {
       </div>
     );
   }
-  return <TotalTestosteroneChartClient data={data} events={events} />;
+  return (
+    <TotalTestosteroneChartClient
+      data={data}
+      events={events}
+      dateRange={dateRange}
+    />
+  );
 }

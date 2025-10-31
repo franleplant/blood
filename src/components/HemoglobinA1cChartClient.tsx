@@ -35,9 +35,11 @@ interface ChartDataPoint {
 export default function HemoglobinA1cChartClient({
   data,
   events,
+  dateRange,
 }: {
   data: HemoglobinA1cDataPoint[];
   events: EventDataPoint[];
+  dateRange?: { min: number; max: number };
 }) {
   const medicationEvents = events.filter(
     (e) =>
@@ -77,7 +79,11 @@ export default function HemoglobinA1cChartClient({
               dataKey="date"
               type="number"
               scale="time"
-              domain={["dataMin", "dataMax"]}
+              domain={
+                dateRange
+                  ? [dateRange.min, dateRange.max]
+                  : ["dataMin", "dataMax"]
+              }
               tickFormatter={(unixTime) =>
                 new Date(unixTime).toLocaleDateString()
               }

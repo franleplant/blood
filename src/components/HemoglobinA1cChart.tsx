@@ -4,6 +4,7 @@ import HemoglobinA1cChartClient from "./HemoglobinA1cChartClient";
 
 interface Props {
   userId: number;
+  dateRange?: { min: number; max: number };
 }
 
 async function getHemoglobinA1cData(userId: number) {
@@ -57,7 +58,7 @@ async function getEventsData(userId: number) {
   }));
 }
 
-export default async function HemoglobinA1cChart({ userId }: Props) {
+export default async function HemoglobinA1cChart({ userId, dateRange }: Props) {
   const [data, events] = await Promise.all([
     getHemoglobinA1cData(userId),
     getEventsData(userId),
@@ -70,5 +71,11 @@ export default async function HemoglobinA1cChart({ userId }: Props) {
       </div>
     );
   }
-  return <HemoglobinA1cChartClient data={data} events={events} />;
+  return (
+    <HemoglobinA1cChartClient
+      data={data}
+      events={events}
+      dateRange={dateRange}
+    />
+  );
 }

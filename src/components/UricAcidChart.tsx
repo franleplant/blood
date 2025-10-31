@@ -50,7 +50,11 @@ async function getAllEvents(): Promise<Event[]> {
   });
 }
 
-export default async function UricAcidChart() {
+export default async function UricAcidChart({
+  dateRange,
+}: {
+  dateRange?: { min: number; max: number };
+}) {
   const allEvents = await getAllEvents();
   const chartData = await getUricAcidData();
 
@@ -59,5 +63,11 @@ export default async function UricAcidChart() {
     value: d.value,
   }));
 
-  return <UricAcidChartClient data={processedChartData} events={allEvents} />;
+  return (
+    <UricAcidChartClient
+      data={processedChartData}
+      events={allEvents}
+      dateRange={dateRange}
+    />
+  );
 }

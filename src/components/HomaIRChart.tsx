@@ -6,6 +6,7 @@ const HOMA_IR_DIVISOR = 405;
 
 interface Props {
   userId: number;
+  dateRange?: { min: number; max: number };
 }
 
 async function getHomaIRData(userId: number) {
@@ -105,7 +106,7 @@ async function getEventsData(userId: number) {
   }));
 }
 
-export default async function HomaIRChart({ userId }: Props) {
+export default async function HomaIRChart({ userId, dateRange }: Props) {
   const [data, events] = await Promise.all([
     getHomaIRData(userId),
     getEventsData(userId),
@@ -119,5 +120,7 @@ export default async function HomaIRChart({ userId }: Props) {
       </div>
     );
   }
-  return <HomaIRChartClient data={data} events={events} />;
+  return (
+    <HomaIRChartClient data={data} events={events} dateRange={dateRange} />
+  );
 }

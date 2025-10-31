@@ -4,6 +4,7 @@ import normalizeTSH from "@/lib/normalize_tsh";
 
 interface Props {
   userId: number;
+  dateRange?: { min: number; max: number };
 }
 
 async function getTSHData(userId: number) {
@@ -49,7 +50,9 @@ async function getTSHData(userId: number) {
         return null;
       }
     })
-    .filter((point): point is { date: number; value: number } => point !== null);
+    .filter(
+      (point): point is { date: number; value: number } => point !== null
+    );
 
   return tshDataPoints;
 }
@@ -73,7 +76,7 @@ async function getEventsData(userId: number) {
   }));
 }
 
-export default async function TSHChart({ userId }: Props) {
+export default async function TSHChart({ userId, dateRange }: Props) {
   const [data, events] = await Promise.all([
     getTSHData(userId),
     getEventsData(userId),
@@ -84,6 +87,5 @@ export default async function TSHChart({ userId }: Props) {
       <div className="w-full text-center p-4">No TSH data to display.</div>
     );
   }
-  return <TSHChartClient data={data} events={events} />;
+  return <TSHChartClient data={data} events={events} dateRange={dateRange} />;
 }
-

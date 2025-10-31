@@ -4,6 +4,7 @@ import normalizeEstradiol from "@/lib/normalize_estradiol";
 
 interface Props {
   userId: number;
+  dateRange?: { min: number; max: number };
 }
 
 async function getEstradiolData(userId: number) {
@@ -70,7 +71,7 @@ async function getEventsData(userId: number) {
   }));
 }
 
-export default async function EstradiolChart({ userId }: Props) {
+export default async function EstradiolChart({ userId, dateRange }: Props) {
   const [data, events] = await Promise.all([
     getEstradiolData(userId),
     getEventsData(userId),
@@ -83,5 +84,7 @@ export default async function EstradiolChart({ userId }: Props) {
       </div>
     );
   }
-  return <EstradiolChartClient data={data} events={events} />;
+  return (
+    <EstradiolChartClient data={data} events={events} dateRange={dateRange} />
+  );
 }

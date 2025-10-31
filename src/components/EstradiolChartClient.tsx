@@ -35,9 +35,11 @@ interface ChartDataPoint {
 export default function EstradiolChartClient({
   data,
   events,
+  dateRange,
 }: {
   data: EstradiolDataPoint[];
   events: EventDataPoint[];
+  dateRange?: { min: number; max: number };
 }) {
   // Filter events for medication events
   const medicationEvents = events.filter(
@@ -81,7 +83,11 @@ export default function EstradiolChartClient({
               dataKey="date"
               type="number"
               scale="time"
-              domain={["dataMin", "dataMax"]}
+              domain={
+                dateRange
+                  ? [dateRange.min, dateRange.max]
+                  : ["dataMin", "dataMax"]
+              }
               tickFormatter={(unixTime) =>
                 new Date(unixTime).toLocaleDateString()
               }

@@ -4,6 +4,7 @@ import TriglyceridesHDLRatioChartClient from "./TriglyceridesHDLRatioChartClient
 
 interface Props {
   userId: number;
+  dateRange?: { min: number; max: number };
 }
 
 async function getTriglyceridesHDLRatioData(userId: number) {
@@ -119,7 +120,10 @@ async function getEvents(userId: number) {
   });
 }
 
-export default async function TriglyceridesHDLRatioChart({ userId }: Props) {
+export default async function TriglyceridesHDLRatioChart({
+  userId,
+  dateRange,
+}: Props) {
   const [data, events] = await Promise.all([
     getTriglyceridesHDLRatioData(userId),
     getEvents(userId),
@@ -133,5 +137,11 @@ export default async function TriglyceridesHDLRatioChart({ userId }: Props) {
     );
   }
 
-  return <TriglyceridesHDLRatioChartClient data={data} events={events} />;
+  return (
+    <TriglyceridesHDLRatioChartClient
+      data={data}
+      events={events}
+      dateRange={dateRange}
+    />
+  );
 }
