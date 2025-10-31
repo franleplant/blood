@@ -1,6 +1,7 @@
 import GlucoseChart from "@/components/GlucoseChart";
 import HemoglobinA1cChart from "@/components/HemoglobinA1cChart";
 import HomaIRChart from "@/components/HomaIRChart";
+import LiverEnzymesChart from "@/components/LiverEnzymesChart";
 import MarkersTable from "@/components/MarkersTable";
 import TriglyceridesHDLRatioChart from "@/components/TriglyceridesHDLRatioChart";
 import UricAcidChart from "@/components/UricAcidChart";
@@ -43,6 +44,10 @@ export default async function Home() {
           <div className="p-4 border rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold mb-4">Uric Acid</h2>
             <UricAcidChart />
+          </div>
+          <div className="p-4 border rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Liver Enzymes</h2>
+            <LiverEnzymesChart userId={userId} />
           </div>
         </div>
 
