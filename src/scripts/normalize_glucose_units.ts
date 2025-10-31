@@ -2,7 +2,7 @@ import path from "path";
 import * as sqlite from "sqlite";
 import sqlite3Driver from "sqlite3";
 import { fileURLToPath } from "url";
-import normalizeGlucose from "../src/normalize_glucose_units.ts"; // Import the normalization function
+import normalizeGlucose from "../lib/normalize_glucose_units"; // Import the normalization function
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
