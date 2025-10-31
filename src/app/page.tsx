@@ -4,6 +4,7 @@ import HemoglobinA1cChart from "@/components/HemoglobinA1cChart";
 import HomaIRChart from "@/components/HomaIRChart";
 import LiverEnzymesChart from "@/components/LiverEnzymesChart";
 import MarkersTable from "@/components/MarkersTable";
+import TSHChart from "@/components/TSHChart";
 import TotalTestosteroneChart from "@/components/TotalTestosteroneChart";
 import TriglyceridesHDLRatioChart from "@/components/TriglyceridesHDLRatioChart";
 import UricAcidChart from "@/components/UricAcidChart";
@@ -58,6 +59,10 @@ export default async function Home() {
           <div className="p-4 border rounded-lg shadow-sm">
             <h2 className="text-xl font-semibold mb-4">Estradiol (E2)</h2>
             <EstradiolChart userId={userId} />
+          </div>
+          <div className="p-4 border rounded-lg shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">TSH</h2>
+            <TSHChart userId={userId} />
           </div>
         </div>
 
