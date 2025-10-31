@@ -115,8 +115,9 @@ async function addIdsToCsv(csvFilePath: string) {
   // Ensure all records have all columns (fill missing ones with empty string)
   const normalizedRecords = recordsWithIds.map((record) => {
     const normalized: Record<string, string> = {};
+    const recordAny = record as Record<string, any>;
     for (const col of columnsWithId) {
-      normalized[col] = record[col] || "";
+      normalized[col] = recordAny[col] || "";
     }
     return normalized;
   });
