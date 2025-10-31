@@ -2,7 +2,7 @@ import path from "path";
 import * as sqlite from "sqlite";
 import sqlite3Driver from "sqlite3";
 import { fileURLToPath } from "url";
-import normalizeGlucose from "../lib/normalize_glucose_units"; // Import the normalization function
+import normalizeUnits from "../lib/normalize_units"; // Import the normalization function
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,10 +69,13 @@ WHERE LOWER(marker_name_en) LIKE '%glucose%'
         const id = row.id;
 
         try {
-          const normalized = normalizeGlucose({
-            value: originalValue,
-            unit: originalUnit,
-          });
+          const normalized = normalizeUnits(
+            {
+              value: originalValue,
+              unit: originalUnit,
+            },
+            "mg/dL"
+          );
 
           if (
             normalized.value !== originalValue ||

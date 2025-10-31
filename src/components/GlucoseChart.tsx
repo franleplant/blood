@@ -1,6 +1,6 @@
 import GlucoseChartClient from "@/components/GlucoseChartClient";
 import { openDatabase } from "@/lib/db";
-import normalizeGlucose from "@/lib/normalize_glucose_units";
+import normalizeUnits from "@/lib/normalize_units";
 
 interface Props {
   userId: number;
@@ -31,10 +31,13 @@ async function getGlucoseData(userId: number) {
   });
 
   const glucoseDataPoints = results.map((row) => {
-    const normalized = normalizeGlucose({
-      value: String(row.value),
-      unit: row.unit ?? "",
-    });
+    const normalized = normalizeUnits(
+      {
+        value: String(row.value),
+        unit: row.unit ?? "",
+      },
+      "mg/dL"
+    );
     return {
       date: new Date(row.date).getTime(),
       value: parseFloat(normalized.value),

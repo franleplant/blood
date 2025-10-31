@@ -1,5 +1,5 @@
 import { openDatabase } from "@/lib/db";
-import normalizeGlucose from "@/lib/normalize_glucose_units";
+import normalizeUnits from "@/lib/normalize_units";
 import HomaIRChartClient from "./HomaIRChartClient";
 
 const HOMA_IR_DIVISOR = 405;
@@ -57,10 +57,13 @@ async function getHomaIRData(userId: number) {
           return null;
         }
 
-        const normalizedGlucose = normalizeGlucose({
-          value: String(row.glucose_value),
-          unit: row.glucose_unit,
-        });
+        const normalizedGlucose = normalizeUnits(
+          {
+            value: String(row.glucose_value),
+            unit: row.glucose_unit,
+          },
+          "mg/dL"
+        );
         const glucoseValMgDl = parseFloat(normalizedGlucose.value);
         const insulinValMicroUML = parseFloat(String(row.insulin_value));
 

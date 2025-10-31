@@ -1,6 +1,6 @@
 import TSHChartClient from "@/components/TSHChartClient";
 import { openDatabase } from "@/lib/db";
-import normalizeTSH from "@/lib/normalize_tsh";
+import normalizeUnits from "@/lib/normalize_units";
 
 interface Props {
   userId: number;
@@ -33,10 +33,13 @@ async function getTSHData(userId: number) {
   const tshDataPoints = results
     .map((row) => {
       try {
-        const normalized = normalizeTSH({
-          value: String(row.value),
-          unit: row.unit ?? "",
-        });
+        const normalized = normalizeUnits(
+          {
+            value: String(row.value),
+            unit: row.unit ?? "",
+          },
+          "µUI/mL"
+        );
         const value = parseFloat(normalized.value);
         if (isNaN(value)) {
           return null;

@@ -1,6 +1,6 @@
 import TotalTestosteroneChartClient from "@/components/TotalTestosteroneChartClient";
 import { openDatabase } from "@/lib/db";
-import normalizeTestosterone from "@/lib/normalize_testosterone";
+import normalizeUnits from "@/lib/normalize_units";
 
 interface Props {
   userId: number;
@@ -28,10 +28,13 @@ async function getTotalTestosteroneData(userId: number) {
   const testosteroneDataPoints = results
     .map((row) => {
       try {
-        const normalized = normalizeTestosterone({
-          value: String(row.value),
-          unit: row.unit ?? "",
-        });
+        const normalized = normalizeUnits(
+          {
+            value: String(row.value),
+            unit: row.unit ?? "",
+          },
+          "ng/mL"
+        );
         const value = parseFloat(normalized.value);
         if (isNaN(value)) {
           return null;

@@ -1,6 +1,6 @@
 import EstradiolChartClient from "@/components/EstradiolChartClient";
 import { openDatabase } from "@/lib/db";
-import normalizeEstradiol from "@/lib/normalize_estradiol";
+import normalizeUnits from "@/lib/normalize_units";
 
 interface Props {
   userId: number;
@@ -28,10 +28,13 @@ async function getEstradiolData(userId: number) {
   const estradiolDataPoints = results
     .map((row) => {
       try {
-        const normalized = normalizeEstradiol({
-          value: String(row.value),
-          unit: row.unit ?? "",
-        });
+        const normalized = normalizeUnits(
+          {
+            value: String(row.value),
+            unit: row.unit ?? "",
+          },
+          "pg/mL"
+        );
         const value = parseFloat(normalized.value);
         if (isNaN(value)) {
           return null;
