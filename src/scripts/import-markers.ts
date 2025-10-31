@@ -61,6 +61,7 @@ async function main() {
       console.error("CSV file is empty or has no headers.");
       return;
     }
+    // Use all columns including 'id' (database now uses UUIDs)
     const columnNames = records[0];
 
     // Step 2: Prepare Database: Create Final and Temporary Tables

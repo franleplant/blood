@@ -22,7 +22,7 @@ model User {
 }
 
 model LabResult {
-  id                    Int     @id @default(autoincrement())
+  id                    String  @id @default(uuid())
   date                  String // Required field
   marker_name_es        String // Required field  
   marker_name_en        String // Required field

@@ -84,6 +84,7 @@ async function main() {
       console.error("❌ CSV file is empty or has no headers.");
       return;
     }
+    // Use all columns including 'id' (database now uses UUIDs)
     const columnNames = records[0];
     console.log(`✅ Found columns: ${columnNames.join(", ")}`);
 
@@ -152,7 +153,11 @@ async function main() {
     for (let i = 0; i < csvRecords.length; i += batchSize) {
       const batch = csvRecords.slice(i, i + batchSize);
       for (const record of batch) {
-        const values = columnNames.map((col) => record[col] || null);
+        // Filter out id column from record values
+        const values = columnNames.map((col) => {
+          const value = record[col];
+          return value !== undefined && value !== null ? value : null;
+        });
         await db.run(insertTempQuery, values);
         tempInsertedCount++;
       }
