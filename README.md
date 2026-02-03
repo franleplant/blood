@@ -2,6 +2,8 @@
 
 This project is a TypeScript-based tool for analyzing blood marker data from a CSV file. It imports the data into a SQLite database and provides scripts to generate plots and perform other analyses.
 
+> A comprehensive health data analysis toolkit for tracking biomarker trends over time.
+
 ## Features
 
 - **CSV to SQLite:** Imports blood marker data from a CSV file into a SQLite database.
