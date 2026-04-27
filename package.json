@@ -20,7 +20,9 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "labs:ingest": "claude -p \"$(cat docs/labs/INGEST_PROMPT.md)\"",
+    "labs:status": "cat docs/labs/INGESTED.md"
   },
   "keywords": [],
   "author": "",
