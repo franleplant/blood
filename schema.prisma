@@ -43,10 +43,11 @@ model LabResult {
 }
 
 model Event {
-  id          Int      @id @default(autoincrement())
-  date        DateTime // Required field
-  title       String // Required field
-  description String // Required field
+  id          Int       @id @default(autoincrement())
+  start_date  DateTime
+  end_date    DateTime?
+  title       String
+  description String
 
   // Foreign key and relation
   user_id Int

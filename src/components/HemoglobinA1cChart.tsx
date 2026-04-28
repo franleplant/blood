@@ -47,12 +47,12 @@ async function getEventsData(userId: number) {
       user_id: userId,
     },
     orderBy: {
-      date: "asc",
+      start_date: "asc",
     },
   });
 
   return events.map((event) => ({
-    date: new Date(event.date),
+    date: new Date(event.start_date),
     title: event.title,
     description: event.description,
   }));

@@ -114,10 +114,15 @@ async function getTriglyceridesHDLRatioData(userId: number) {
 
 async function getEvents(userId: number) {
   const { prisma } = await openDatabase();
-  return await prisma.event.findMany({
+  const events = await prisma.event.findMany({
     where: { user_id: userId },
-    orderBy: { date: "asc" },
+    orderBy: { start_date: "asc" },
   });
+  return events.map((event) => ({
+    date: new Date(event.start_date),
+    title: event.title,
+    description: event.description,
+  }));
 }
 
 export default async function TriglyceridesHDLRatioChart({

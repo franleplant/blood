@@ -248,11 +248,13 @@ WHERE existing.id IS NULL;`;
     const insertedCount = insertResult.changes || 0;
     console.log(`✅ Inserted ${insertedCount} new rows in ${queryDuration}ms.`);
 
-    // Clean up temporary indexes
+    // Clean up temporary indexes (both — leaving idx_existing_duplicate_check
+    // behind makes Prisma report drift on the next migration).
     try {
       await db.exec(`DROP INDEX IF EXISTS idx_temp_duplicate_check;`);
+      await db.exec(`DROP INDEX IF EXISTS idx_existing_duplicate_check;`);
     } catch {
-      // Ignore errors when dropping temp index
+      // Ignore errors when dropping temp indexes
     }
 
     const skippedCount = tempRowCount - insertedCount;
