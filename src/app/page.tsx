@@ -3,7 +3,6 @@ import GlucoseChart from "@/components/GlucoseChart";
 import HemoglobinA1cChart from "@/components/HemoglobinA1cChart";
 import HomaIRChart from "@/components/HomaIRChart";
 import LiverEnzymesChart from "@/components/LiverEnzymesChart";
-import MarkersTable from "@/components/MarkersTable";
 import TSHChart from "@/components/TSHChart";
 import TotalTestosteroneChart from "@/components/TotalTestosteroneChart";
 import TriglyceridesHDLRatioChart from "@/components/TriglyceridesHDLRatioChart";
@@ -62,53 +61,46 @@ export default async function Home() {
         </p>
       </div>
 
-      <div className="space-y-12">
-        <div className="space-y-8">
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Glucose</h2>
-            <GlucoseChart userId={userId} dateRange={dateRange} />
-          </div>
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">
-              Glycated Hemoglobin (HbA1c)
-            </h2>
-            <HemoglobinA1cChart userId={userId} dateRange={dateRange} />
-          </div>
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">HOMA-IR</h2>
-            <HomaIRChart userId={userId} dateRange={dateRange} />
-          </div>
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">
-              Triglycerides/HDL Ratio
-            </h2>
-            <TriglyceridesHDLRatioChart userId={userId} dateRange={dateRange} />
-          </div>
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Uric Acid</h2>
-            <UricAcidChart dateRange={dateRange} />
-          </div>
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Liver Enzymes</h2>
-            <LiverEnzymesChart userId={userId} dateRange={dateRange} />
-          </div>
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Total Testosterone</h2>
-            <TotalTestosteroneChart userId={userId} dateRange={dateRange} />
-          </div>
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Estradiol (E2)</h2>
-            <EstradiolChart userId={userId} dateRange={dateRange} />
-          </div>
-          <div className="p-4 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">TSH</h2>
-            <TSHChart userId={userId} dateRange={dateRange} />
-          </div>
+      <div className="space-y-8">
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">Glucose</h2>
+          <GlucoseChart userId={userId} dateRange={dateRange} />
         </div>
-
-        <div>
-          <h2 className="text-2xl font-bold text-center my-8">All Markers</h2>
-          <MarkersTable userId={userId} />
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">
+            Glycated Hemoglobin (HbA1c)
+          </h2>
+          <HemoglobinA1cChart userId={userId} dateRange={dateRange} />
+        </div>
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">HOMA-IR</h2>
+          <HomaIRChart userId={userId} dateRange={dateRange} />
+        </div>
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">
+            Triglycerides/HDL Ratio
+          </h2>
+          <TriglyceridesHDLRatioChart userId={userId} dateRange={dateRange} />
+        </div>
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">Uric Acid</h2>
+          <UricAcidChart dateRange={dateRange} />
+        </div>
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">Liver Enzymes</h2>
+          <LiverEnzymesChart userId={userId} dateRange={dateRange} />
+        </div>
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">Total Testosterone</h2>
+          <TotalTestosteroneChart userId={userId} dateRange={dateRange} />
+        </div>
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">Estradiol (E2)</h2>
+          <EstradiolChart userId={userId} dateRange={dateRange} />
+        </div>
+        <div className="p-4 border rounded-lg shadow-sm">
+          <h2 className="text-xl font-semibold mb-4">TSH</h2>
+          <TSHChart userId={userId} dateRange={dateRange} />
         </div>
       </div>
     </main>
