@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" style={{ colorScheme: "light" }}>
       <body className={inter.className}>
         <nav className="border-b">
           <div className="container mx-auto flex items-center gap-6 px-4 py-3 md:px-6 lg:px-8">
