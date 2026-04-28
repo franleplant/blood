@@ -1,0 +1,1405 @@
+"use client";
+
+import {
+  Activity,
+  ArrowRight,
+  Atom,
+  Ban,
+  ChevronDown,
+  ChevronLeft,
+  CircleDot,
+  Droplet,
+  Dumbbell,
+  FlaskConical,
+  LayoutGrid,
+  Leaf,
+  MoreHorizontal,
+  Moon,
+  Network,
+  Pill,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
+  TrendingDown,
+  TrendingUp,
+  TriangleAlert,
+  X,
+  Zap,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  buildMonthTicks,
+  CATEGORY_META,
+  CATEGORY_ORDER,
+  type Cluster,
+  type DashboardData,
+  type DenseRegion,
+  daysBetween,
+  type EventCategory,
+  type EventItem,
+  formatDateShort,
+  formatDateTiny,
+  type Marker,
+  parseEventTitle,
+} from "./dashboard-data";
+import { TimelineMarkerChart } from "./timeline/chart";
+import { TimelineProvider, useTimeline } from "./timeline/context";
+import { TimelineOverlay, TimelineSurface } from "./timeline/surface";
+
+const TIME_RANGES = ["1M", "3M", "6M", "1Y", "2Y", "ALL"] as const;
+type TimeRange = (typeof TIME_RANGES)[number];
+
+const ROW_HEIGHT = 80;
+const LANE_HEIGHT = 44;
+const CHART_LEFT = 130;
+const RANGE_COL = 156;
+const CHART_RIGHT = 128;
+const GRID_COLS = `${CHART_LEFT}px ${RANGE_COL}px 1fr ${CHART_RIGHT}px`;
+
+type HoveredEvent = {
+  eventKey: string;
+  pairId?: string;
+} | null;
+
+type OpenCluster = { clusterId: string } | null;
+
+export default function Dashboard({ data }: { data: DashboardData }) {
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeRange, setActiveRange] = useState<TimeRange>("2Y");
+  const [compareOn, setCompareOn] = useState(false);
+  const [hoveredCluster, setHoveredCluster] = useState<string | null>(null);
+  const [hoveredEvent, setHoveredEvent] = useState<HoveredEvent>(null);
+  const [openCluster, setOpenCluster] = useState<OpenCluster>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const allEvents = useMemo(
+    () => [...data.events, ...data.clusters.flatMap((c) => c.events)],
+    [data.events, data.clusters],
+  );
+
+  const eventsByPair = useMemo(() => {
+    const m = new Map<string, EventItem[]>();
+    for (const e of allEvents) {
+      if (!e.pairId) continue;
+      const arr = m.get(e.pairId) ?? [];
+      arr.push(e);
+      m.set(e.pairId, arr);
+    }
+    return m;
+  }, [allEvents]);
+
+  const clusterByEventKey = useMemo(() => {
+    const m = new Map<string, Cluster>();
+    for (const c of data.clusters)
+      for (const e of c.events) m.set(e.key, c);
+    return m;
+  }, [data.clusters]);
+
+  const activePairId = hoveredEvent?.pairId ?? null;
+  const activePair = activePairId
+    ? eventsByPair.get(activePairId) ?? null
+    : null;
+
+  // Compute visible time window from active range vs full timeline
+  const visibleRange = useMemo(() => {
+    const end = data.timelineEnd;
+    const start = (() => {
+      switch (activeRange) {
+        case "1M":
+          return end - 31 * 86400000;
+        case "3M":
+          return end - 92 * 86400000;
+        case "6M":
+          return end - 184 * 86400000;
+        case "1Y":
+          return end - 366 * 86400000;
+        case "2Y":
+          return end - 731 * 86400000;
+        case "ALL":
+          return data.timelineStart;
+      }
+    })();
+    return {
+      start: Math.max(start, data.timelineStart),
+      end,
+    };
+  }, [activeRange, data.timelineStart, data.timelineEnd]);
+
+  const monthTicks = useMemo(() => {
+    const all = buildMonthTicks(visibleRange.start, visibleRange.end);
+    const months = Math.max(
+      1,
+      Math.round((visibleRange.end - visibleRange.start) / (30 * 86400000)),
+    );
+    let step = 1;
+    if (months > 60) step = 12;
+    else if (months > 30) step = 6;
+    else if (months > 14) step = 3;
+    return all.filter((_, i) => i % step === 0);
+  }, [visibleRange]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="flex flex-col">
+        <div className="flex gap-5">
+          {sidebarOpen && (
+            <Sidebar
+              activeFilter={activeFilter}
+              setActiveFilter={setActiveFilter}
+              counts={data.sidebarCounts}
+              onHide={() => setSidebarOpen(false)}
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <MainPanel
+              data={data}
+              visibleRange={visibleRange}
+              monthTicks={monthTicks}
+              sidebarOpen={sidebarOpen}
+              onShowSidebar={() => setSidebarOpen(true)}
+              activeRange={activeRange}
+              setActiveRange={setActiveRange}
+              compareOn={compareOn}
+              setCompareOn={setCompareOn}
+              hoveredCluster={hoveredCluster}
+              setHoveredCluster={setHoveredCluster}
+              hoveredEvent={hoveredEvent}
+              setHoveredEvent={setHoveredEvent}
+              openCluster={openCluster}
+              setOpenCluster={setOpenCluster}
+              clusterByEventKey={clusterByEventKey}
+              activePair={activePair}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------- Sidebar -------------------------- */
+
+function Sidebar({
+  activeFilter,
+  setActiveFilter,
+  counts,
+  onHide,
+}: {
+  activeFilter: string;
+  setActiveFilter: (id: string) => void;
+  counts: { all: number; outOfRange: number; derived: number; raw: number };
+  onHide: () => void;
+}) {
+  const quickFilters: {
+    id: string;
+    label: string;
+    count: number;
+    Icon: typeof Star;
+    iconBg: string;
+    iconColor: string;
+  }[] = [
+    {
+      id: "all",
+      label: "All Markers",
+      count: counts.all,
+      Icon: LayoutGrid,
+      iconBg: "#dbeafe",
+      iconColor: "#2563eb",
+    },
+    {
+      id: "favorites",
+      label: "Favorites",
+      count: 0,
+      Icon: Star,
+      iconBg: "#fef3c7",
+      iconColor: "#d97706",
+    },
+    {
+      id: "out-of-range",
+      label: "Out of Range",
+      count: counts.outOfRange,
+      Icon: TriangleAlert,
+      iconBg: "#fee2e2",
+      iconColor: "#dc2626",
+    },
+    {
+      id: "improving",
+      label: "Improving",
+      count: 0,
+      Icon: TrendingUp,
+      iconBg: "#dcfce7",
+      iconColor: "#16a34a",
+    },
+    {
+      id: "worsening",
+      label: "Worsening",
+      count: 0,
+      Icon: TrendingDown,
+      iconBg: "#fee2e2",
+      iconColor: "#dc2626",
+    },
+    {
+      id: "most-changed",
+      label: "Most Changed",
+      count: 0,
+      Icon: Zap,
+      iconBg: "#fef3c7",
+      iconColor: "#ca8a04",
+    },
+    {
+      id: "derived",
+      label: "Derived Markers",
+      count: counts.derived,
+      Icon: Network,
+      iconBg: "#ede9fe",
+      iconColor: "#7c3aed",
+    },
+    {
+      id: "raw",
+      label: "Raw Markers",
+      count: counts.raw,
+      Icon: FlaskConical,
+      iconBg: "#e0e7ff",
+      iconColor: "#4f46e5",
+    },
+  ];
+
+  const categories: {
+    id: string;
+    label: string;
+    count: number;
+    Icon: typeof Activity;
+  }[] = [
+    { id: "metabolic", label: "Metabolic", count: 0, Icon: Activity },
+    { id: "blood-sugar", label: "Blood Sugar", count: 0, Icon: Droplet },
+    { id: "lipids", label: "Lipids", count: 0, Icon: CircleDot },
+    { id: "hormones", label: "Hormones", count: 0, Icon: Sparkles },
+  ];
+
+  return (
+    <aside className="w-[244px] shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-base font-semibold text-slate-900">Filters</div>
+        <button
+          onClick={onHide}
+          className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700"
+        >
+          Hide <ChevronLeft className="size-3.5" />
+        </button>
+      </div>
+
+      <div className="mb-2 px-1 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+        QUICK FILTERS
+      </div>
+      <ul className="flex flex-col gap-0.5">
+        {quickFilters.map(
+          ({ id, label, count, Icon, iconBg, iconColor }) => {
+            const selected = id === activeFilter;
+            return (
+              <li key={id}>
+                <button
+                  onClick={() => setActiveFilter(id)}
+                  className={`group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition ${
+                    selected
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span
+                    className="flex size-7 items-center justify-center rounded-md"
+                    style={{
+                      background: selected ? "#dbeafe" : iconBg,
+                      color: selected ? "#2563eb" : iconColor,
+                    }}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="flex-1 text-left font-medium">{label}</span>
+                  <span
+                    className={`min-w-6 rounded-md px-1.5 py-0.5 text-center text-[11px] font-semibold ${
+                      selected
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              </li>
+            );
+          },
+        )}
+      </ul>
+
+      <div className="mt-5 mb-2 flex items-center justify-between px-1">
+        <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+          CATEGORIES
+        </div>
+        <ChevronDown className="size-3.5 text-slate-400" />
+      </div>
+      <ul className="flex flex-col gap-0.5">
+        {categories.map(({ id, label, count, Icon }) => (
+          <li key={id}>
+            <button className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50">
+              <span className="flex size-7 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+                <Icon className="size-4" />
+              </span>
+              <span className="flex-1 text-left">{label}</span>
+              <span className="min-w-6 rounded-md bg-slate-100 px-1.5 py-0.5 text-center text-[11px] font-semibold text-slate-600">
+                {count}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+
+/* -------------------------- Main panel -------------------------- */
+
+function MainPanel({
+  data,
+  visibleRange,
+  monthTicks,
+  sidebarOpen,
+  onShowSidebar,
+  activeRange,
+  setActiveRange,
+  compareOn,
+  setCompareOn,
+  hoveredCluster,
+  setHoveredCluster,
+  hoveredEvent,
+  setHoveredEvent,
+  openCluster,
+  setOpenCluster,
+  clusterByEventKey,
+  activePair,
+}: {
+  data: DashboardData;
+  visibleRange: { start: number; end: number };
+  monthTicks: { label: string; ms: number }[];
+  sidebarOpen: boolean;
+  onShowSidebar: () => void;
+  activeRange: TimeRange;
+  setActiveRange: (r: TimeRange) => void;
+  compareOn: boolean;
+  setCompareOn: (b: boolean) => void;
+  hoveredCluster: string | null;
+  setHoveredCluster: (id: string | null) => void;
+  hoveredEvent: HoveredEvent;
+  setHoveredEvent: (e: HoveredEvent) => void;
+  openCluster: OpenCluster;
+  setOpenCluster: (o: OpenCluster) => void;
+  clusterByEventKey: Map<string, Cluster>;
+  activePair: EventItem[] | null;
+}) {
+  const visibleCategories = data.categoriesPresent.length
+    ? data.categoriesPresent
+    : (["medications", "lifestyle", "nutrition", "sleep"] as EventCategory[]);
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <Header
+        sidebarOpen={sidebarOpen}
+        onShowSidebar={onShowSidebar}
+        activeRange={activeRange}
+        setActiveRange={setActiveRange}
+        compareOn={compareOn}
+        setCompareOn={setCompareOn}
+        markerCount={data.sidebarCounts.all}
+      />
+      <Timeline
+        data={data}
+        visibleRange={visibleRange}
+        monthTicks={monthTicks}
+        visibleCategories={visibleCategories}
+        hoveredCluster={hoveredCluster}
+        setHoveredCluster={setHoveredCluster}
+        hoveredEvent={hoveredEvent}
+        setHoveredEvent={setHoveredEvent}
+        openCluster={openCluster}
+        setOpenCluster={setOpenCluster}
+        clusterByEventKey={clusterByEventKey}
+        activePair={activePair}
+      />
+    </section>
+  );
+}
+
+function Header({
+  sidebarOpen,
+  onShowSidebar,
+  activeRange,
+  setActiveRange,
+  compareOn,
+  setCompareOn,
+  markerCount,
+}: {
+  sidebarOpen: boolean;
+  onShowSidebar: () => void;
+  activeRange: TimeRange;
+  setActiveRange: (r: TimeRange) => void;
+  compareOn: boolean;
+  setCompareOn: (b: boolean) => void;
+  markerCount: number;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+      <div className="flex items-center gap-3">
+        {!sidebarOpen && (
+          <button
+            onClick={onShowSidebar}
+            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+            title="Show filters"
+          >
+            <SlidersHorizontal className="size-4" />
+          </button>
+        )}
+        <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <span className="flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-600">
+            <span className="text-[11px] font-bold">A↗</span>
+          </span>
+          All Markers
+          <span className="min-w-5 rounded-md bg-slate-100 px-1.5 py-0.5 text-center text-[11px] font-semibold text-slate-600">
+            {markerCount}
+          </span>
+          <ChevronDown className="size-3.5 text-slate-400" />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+        {TIME_RANGES.map((r) => (
+          <button
+            key={r}
+            onClick={() => setActiveRange(r)}
+            className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
+              activeRange === r
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setCompareOn(!compareOn)}
+          className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <SlidersHorizontal className="size-3.5" />
+          Compare
+          <span
+            className={`relative inline-flex h-4 w-7 items-center rounded-full transition ${
+              compareOn ? "bg-blue-600" : "bg-slate-300"
+            }`}
+          >
+            <span
+              className={`inline-block size-3 rounded-full bg-white transition ${
+                compareOn ? "translate-x-3.5" : "translate-x-0.5"
+              }`}
+            />
+          </span>
+        </button>
+        <button className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <SlidersHorizontal className="size-3.5" />
+          View Options
+        </button>
+        <button className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50">
+          <MoreHorizontal className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------- Timeline -------------------------- */
+
+function Timeline(props: {
+  data: DashboardData;
+  visibleRange: { start: number; end: number };
+  monthTicks: { label: string; ms: number }[];
+  visibleCategories: EventCategory[];
+  hoveredCluster: string | null;
+  setHoveredCluster: (id: string | null) => void;
+  hoveredEvent: HoveredEvent;
+  setHoveredEvent: (e: HoveredEvent) => void;
+  openCluster: OpenCluster;
+  setOpenCluster: (o: OpenCluster) => void;
+  clusterByEventKey: Map<string, Cluster>;
+  activePair: EventItem[] | null;
+}) {
+  return (
+    <div className="px-5 pt-4 pb-5">
+      <TimelineProvider domain={props.visibleRange}>
+        <TimelineSurface>
+          <TimelineBody {...props} />
+        </TimelineSurface>
+      </TimelineProvider>
+    </div>
+  );
+}
+
+function TimelineBody({
+  data,
+  visibleRange,
+  monthTicks,
+  visibleCategories,
+  hoveredCluster,
+  setHoveredCluster,
+  hoveredEvent,
+  setHoveredEvent,
+  openCluster,
+  setOpenCluster,
+  clusterByEventKey,
+  activePair,
+}: {
+  data: DashboardData;
+  visibleRange: { start: number; end: number };
+  monthTicks: { label: string; ms: number }[];
+  visibleCategories: EventCategory[];
+  hoveredCluster: string | null;
+  setHoveredCluster: (id: string | null) => void;
+  hoveredEvent: HoveredEvent;
+  setHoveredEvent: (e: HoveredEvent) => void;
+  openCluster: OpenCluster;
+  setOpenCluster: (o: OpenCluster) => void;
+  clusterByEventKey: Map<string, Cluster>;
+  activePair: EventItem[] | null;
+}) {
+  const tl = useTimeline();
+  const visibleDenseRegions = data.denseRegions.filter(
+    (r) => r.end >= visibleRange.start && r.start <= visibleRange.end,
+  );
+  const latestSubtitle = data.latestSampleMs
+    ? formatDateShort(data.latestSampleMs)
+    : "—";
+
+  const categoriesOrdered = CATEGORY_ORDER.filter((c) =>
+    visibleCategories.includes(c),
+  );
+
+  return (
+    <>
+      <div
+        className="grid items-end pb-2"
+        style={{ gridTemplateColumns: GRID_COLS }}
+      >
+        <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+          MARKER
+        </div>
+        <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+          RANGE
+        </div>
+        <div ref={tl.measureRef} className="relative h-5">
+          {tl.width > 0 &&
+            monthTicks.map((t) => {
+              const x = tl.xScale(t.ms);
+              if (x < 0 || x > tl.width) return null;
+              return (
+                <div
+                  key={t.ms}
+                  className="absolute -translate-x-1/2 text-[11px] font-medium text-slate-500"
+                  style={{ left: x }}
+                >
+                  {t.label}
+                </div>
+              );
+            })}
+        </div>
+        <div className="pl-3">
+          <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+            LATEST
+          </div>
+          <div className="text-[10px] text-slate-400">{latestSubtitle}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col">
+        {data.markers.map((marker, i) => (
+          <MarkerRow
+            key={marker.id}
+            marker={marker}
+            denseRegions={visibleDenseRegions}
+            isLast={i === data.markers.length - 1}
+          />
+        ))}
+      </div>
+
+      <div
+        className="mt-4 grid items-center"
+        style={{ gridTemplateColumns: GRID_COLS }}
+      >
+        <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+          EVENTS
+        </div>
+        <div />
+        <div />
+        <div />
+      </div>
+
+      <div className="mt-2 flex flex-col">
+        {categoriesOrdered.map((cat) => (
+          <EventLane
+            key={cat}
+            category={cat}
+            denseRegions={visibleDenseRegions}
+            looseEvents={data.events.filter((e) => e.category === cat)}
+            clusters={data.clusters.filter((c) => c.category === cat)}
+            hoveredCluster={hoveredCluster}
+            setHoveredCluster={setHoveredCluster}
+            hoveredEvent={hoveredEvent}
+            setHoveredEvent={setHoveredEvent}
+            openCluster={openCluster}
+            setOpenCluster={setOpenCluster}
+            clusterByEventKey={clusterByEventKey}
+            activePair={activePair}
+          />
+        ))}
+      </div>
+
+      {data.clusters.length > 0 && (
+        <div
+          className="mt-8 grid items-center"
+          style={{ gridTemplateColumns: GRID_COLS }}
+        >
+          <div />
+          <div />
+          <div className="flex items-center justify-end gap-2 pr-2 text-[11px] text-slate-500">
+            <span>Event density</span>
+            <span>Low</span>
+            <span className="block h-1.5 w-28 rounded-full bg-gradient-to-r from-violet-100 via-violet-300 to-violet-500" />
+            <span>High</span>
+          </div>
+          <div />
+        </div>
+      )}
+
+      <TimelineOverlay
+        ticks={monthTicks.map((t) => t.ms)}
+        chartLeftPx={CHART_LEFT + RANGE_COL}
+      />
+    </>
+  );
+}
+
+/* -------------------------- Marker row -------------------------- */
+
+function MarkerRow({
+  marker,
+  denseRegions,
+  isLast,
+}: {
+  marker: Marker;
+  denseRegions: DenseRegion[];
+  isLast: boolean;
+}) {
+  const { xScale, width } = useTimeline();
+  return (
+    <div
+      className="grid items-stretch"
+      style={{
+        gridTemplateColumns: GRID_COLS,
+        height: ROW_HEIGHT,
+      }}
+    >
+      <div className="flex flex-col justify-center pr-3">
+        <div className="text-sm font-semibold text-slate-900">
+          {marker.name}
+        </div>
+        <div className="text-[11px] text-slate-500">
+          {marker.derived ? "(derived)" : marker.unit}
+        </div>
+      </div>
+
+      <RangeCell marker={marker} />
+
+      <div className="relative">
+        {width > 0 &&
+          denseRegions.map((r, i) => {
+            const left = xScale(r.start);
+            const right = xScale(r.end);
+            return (
+              <div
+                key={i}
+                className="absolute inset-y-1 rounded-md"
+                style={{
+                  left,
+                  width: right - left,
+                  background:
+                    "linear-gradient(180deg, rgba(139,92,246,0.10), rgba(139,92,246,0.06))",
+                }}
+              />
+            );
+          })}
+        <TimelineMarkerChart
+          points={marker.data}
+          yDomain={[marker.yMin, marker.yMax]}
+          color={marker.color}
+          zoneTop={marker.zoneTop}
+          zoneMid={marker.zoneMid}
+          zoneBottom={marker.zoneBottom}
+          height={ROW_HEIGHT}
+        />
+        {!isLast && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-slate-100" />
+        )}
+      </div>
+
+      <div className="flex flex-col items-end justify-center gap-0.5 pl-3">
+        <div className="flex items-center gap-2">
+          <div className="text-[20px] font-semibold leading-none text-slate-900">
+            {formatLatest(marker.latest)}
+          </div>
+          <Sparkline marker={marker} />
+        </div>
+        <div
+          className={`text-[12px] font-medium ${statusColor(marker.status)}`}
+        >
+          {marker.status}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RangeCell({ marker }: { marker: Marker }) {
+  return (
+    <div className="flex flex-col justify-center gap-0.5 pr-3 text-[11.5px] leading-tight">
+      {marker.rangeRows.map((row, i) => (
+        <div
+          key={i}
+          className={`grid grid-cols-[60px_1fr] items-center font-medium ${rangeToneClass(row.tone)}`}
+        >
+          <span>{row.label}</span>
+          <span className="tabular-nums">{row.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function rangeToneClass(tone: "high" | "borderline" | "optimal" | "low"): string {
+  switch (tone) {
+    case "high":
+      return "text-rose-600";
+    case "borderline":
+      return "text-amber-600";
+    case "optimal":
+      return "text-emerald-600";
+    case "low":
+      return "text-sky-500";
+  }
+}
+
+function formatLatest(v: number): string {
+  if (Math.abs(v) >= 100) return v.toFixed(0);
+  if (Math.abs(v) >= 10) return v.toFixed(1);
+  return v.toFixed(2);
+}
+
+function statusColor(status: string): string {
+  switch (status) {
+    case "Optimal":
+    case "Good":
+      return "text-emerald-600";
+    case "Borderline":
+      return "text-amber-600";
+    case "High":
+    case "Low":
+      return "text-rose-600";
+    default:
+      return "text-slate-500";
+  }
+}
+
+function Sparkline({ marker }: { marker: Marker }) {
+  const points = marker.data.slice(-8);
+  if (points.length < 2) return null;
+  const W = 60;
+  const H = 18;
+  const minV = Math.min(...points.map((p) => p.value));
+  const maxV = Math.max(...points.map((p) => p.value));
+  const span = Math.max(1e-6, maxV - minV);
+  const x = (i: number) => (i / (points.length - 1)) * (W - 4) + 2;
+  const y = (v: number) => H - 2 - ((v - minV) / span) * (H - 4);
+  const d = points
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(p.value)}`)
+    .join(" ");
+  return (
+    <svg width={W} height={H} className="opacity-80">
+      <path
+        d={d}
+        fill="none"
+        stroke={marker.color}
+        strokeWidth={1.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* -------------------------- Event lane -------------------------- */
+
+function categoryIcon(cat: EventCategory) {
+  switch (cat) {
+    case "medications":
+      return Pill;
+    case "supplements":
+      return Pill;
+    case "lifestyle":
+      return Atom;
+    case "nutrition":
+      return Leaf;
+    case "sleep":
+      return Moon;
+    case "training":
+      return Dumbbell;
+  }
+}
+
+function EventLane({
+  category,
+  denseRegions,
+  looseEvents,
+  clusters,
+  hoveredCluster,
+  setHoveredCluster,
+  hoveredEvent,
+  setHoveredEvent,
+  openCluster,
+  setOpenCluster,
+  clusterByEventKey,
+  activePair,
+}: {
+  category: EventCategory;
+  denseRegions: DenseRegion[];
+  looseEvents: EventItem[];
+  clusters: Cluster[];
+  hoveredCluster: string | null;
+  setHoveredCluster: (id: string | null) => void;
+  hoveredEvent: HoveredEvent;
+  setHoveredEvent: (e: HoveredEvent) => void;
+  openCluster: OpenCluster;
+  setOpenCluster: (o: OpenCluster) => void;
+  clusterByEventKey: Map<string, Cluster>;
+  activePair: EventItem[] | null;
+}) {
+  const { xScale, width, domain } = useTimeline();
+  const meta = CATEGORY_META[category];
+  const LaneIcon = categoryIcon(category);
+
+  const visibleInRange = looseEvents.filter(
+    (e) => e.date >= domain.start && e.date <= domain.end,
+  );
+  const visibleClusters = clusters.filter(
+    (c) => c.date >= domain.start && c.date <= domain.end,
+  );
+
+  // For short pairs (e.g., 8-day course on a 2Y view) the start and stop
+  // icons would be drawn on top of each other. Drop the stop icon — the
+  // dashed connector underneath still encodes the duration and the start
+  // icon's tooltip carries the full date range.
+  const ICON_OVERLAP_PX = 26;
+  const startByPair = new Map<string, EventItem>();
+  for (const e of visibleInRange) {
+    if (e.pairKind === "start" && e.pairId) startByPair.set(e.pairId, e);
+  }
+  const visibleLooseEvents =
+    width === 0
+      ? visibleInRange
+      : visibleInRange.filter((e) => {
+          if (e.pairKind !== "stop" || !e.pairId) return true;
+          const start = startByPair.get(e.pairId);
+          if (!start) return true;
+          return (
+            Math.abs(xScale(e.date) - xScale(start.date)) >= ICON_OVERLAP_PX
+          );
+        });
+
+  // Pixel-based visual clustering: when icons fall too close at the current
+  // zoom to be told apart, collapse them into a +N pill. Naturally zoom-
+  // aware — zooming in widens the gaps and the cluster dissolves into
+  // individual icons. Operates only on loose events; data-level clusters
+  // are rendered separately below.
+  const ICON_CLUSTER_PX = 52;
+  const sortedVisible = [...visibleLooseEvents].sort(
+    (a, b) => a.date - b.date,
+  );
+  type LaneItem =
+    | { kind: "single"; event: EventItem; x: number }
+    | {
+        kind: "visual-cluster";
+        id: string;
+        events: EventItem[];
+        date: number;
+        x: number;
+      };
+  const laneItems: LaneItem[] = [];
+  if (width === 0) {
+    for (const ev of sortedVisible) {
+      laneItems.push({ kind: "single", event: ev, x: 0 });
+    }
+  } else {
+    let i = 0;
+    while (i < sortedVisible.length) {
+      let j = i;
+      while (
+        j + 1 < sortedVisible.length &&
+        xScale(sortedVisible[j + 1].date) - xScale(sortedVisible[j].date) <
+          ICON_CLUSTER_PX
+      ) {
+        j++;
+      }
+      if (j > i) {
+        const events = sortedVisible.slice(i, j + 1);
+        const date =
+          events.reduce((acc, e) => acc + e.date, 0) / events.length;
+        laneItems.push({
+          kind: "visual-cluster",
+          id: `visual-${category}-${events[0].key}`,
+          events,
+          date,
+          x: xScale(date),
+        });
+      } else {
+        const ev = sortedVisible[i];
+        laneItems.push({
+          kind: "single",
+          event: ev,
+          x: xScale(ev.date),
+        });
+      }
+      i = j + 1;
+    }
+  }
+
+  // Labels render to the right of their icon. Hide a single's label when
+  // the next lane item is too close to fit "Started <Subject>" between
+  // them.
+  const MIN_LABEL_GAP_PX = 110;
+  const labelHidden = new Set<string>();
+  for (let i = 0; i < laneItems.length; i++) {
+    const item = laneItems[i];
+    if (item.kind !== "single") continue;
+    if (item.event.hideLabel) {
+      labelHidden.add(item.event.key);
+      continue;
+    }
+    if (width === 0) continue;
+    const next = laneItems[i + 1];
+    if (next != null && next.x - item.x < MIN_LABEL_GAP_PX) {
+      labelHidden.add(item.event.key);
+    }
+  }
+
+  // Pair shading + connector for active pair on this lane
+  const pairInLane = activePair?.filter((e) => e.category === category) ?? [];
+  const pairStart = pairInLane.find((e) => e.pairKind === "start");
+  const pairStop = pairInLane.find((e) => e.pairKind === "stop");
+  const stopInClusterId = pairStop
+    ? clusterByEventKey.get(pairStop.key)?.id
+    : null;
+
+  // When a tooltip/panel is showing inside this lane, lift the lane above
+  // sibling lanes so the overlay's stacking context wins. Without this the
+  // next lane's pills paint on top of this lane's panel.
+  const activeClusterId = hoveredCluster ?? openCluster?.clusterId ?? null;
+  const isActiveLane =
+    (hoveredEvent?.eventKey != null &&
+      looseEvents.some((e) => e.key === hoveredEvent.eventKey)) ||
+    (activeClusterId != null &&
+      (clusters.some((c) => c.id === activeClusterId) ||
+        laneItems.some(
+          (it) =>
+            it.kind === "visual-cluster" && it.id === activeClusterId,
+        )));
+
+  return (
+    <div
+      className="grid items-stretch"
+      style={{
+        gridTemplateColumns: GRID_COLS,
+        height: LANE_HEIGHT,
+        position: "relative",
+        zIndex: isActiveLane ? 30 : undefined,
+      }}
+    >
+      <div className="flex items-center gap-2 pl-1">
+        <span
+          className="flex size-6 items-center justify-center rounded-md"
+          style={{ background: meta.bg, color: meta.color }}
+        >
+          <LaneIcon className="size-3.5" />
+        </span>
+        <span className="text-xs font-medium text-slate-600">
+          {meta.label}
+        </span>
+      </div>
+
+      <div />
+
+      <div className="relative">
+        {width > 0 &&
+          denseRegions.map((r, i) => {
+            const left = xScale(r.start);
+            const right = xScale(r.end);
+            return (
+              <div
+                key={i}
+                className="pointer-events-none absolute inset-y-1 rounded-md"
+                style={{
+                  left,
+                  width: right - left,
+                  background:
+                    "linear-gradient(180deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04))",
+                }}
+              />
+            );
+          })}
+
+        {width > 0 && pairStart && pairStop && (
+          <div
+            className="pointer-events-none absolute top-1/2 -translate-y-1/2"
+            style={{
+              left: xScale(pairStart.date),
+              width: xScale(pairStop.date) - xScale(pairStart.date),
+              height: 0,
+              borderTop: `1px dashed ${meta.color}80`,
+            }}
+          />
+        )}
+
+        {width > 0 &&
+          laneItems.map((item) => {
+            if (item.kind === "single") {
+              const ev = item.event;
+              return (
+                <EventMarker
+                  key={ev.key}
+                  event={ev}
+                  hideLabel={labelHidden.has(ev.key)}
+                  highlighted={
+                    hoveredEvent?.eventKey === ev.key ||
+                    (activePair?.some((p) => p.key === ev.key) ?? false)
+                  }
+                  onMouseEnter={() =>
+                    setHoveredEvent({ eventKey: ev.key, pairId: ev.pairId })
+                  }
+                  onMouseLeave={() => setHoveredEvent(null)}
+                />
+              );
+            }
+            const synthetic: Cluster = {
+              id: item.id,
+              category,
+              date: item.date,
+              events: item.events,
+            };
+            const isOpen = openCluster?.clusterId === synthetic.id;
+            const isHovered = hoveredCluster === synthetic.id || isOpen;
+            return (
+              <ClusterPill
+                key={synthetic.id}
+                cluster={synthetic}
+                hovered={isHovered}
+                isOpen={isOpen}
+                highlightStop={false}
+                onMouseEnter={() => setHoveredCluster(synthetic.id)}
+                onMouseLeave={() => setHoveredCluster(null)}
+                onClick={() =>
+                  setOpenCluster(
+                    isOpen ? null : { clusterId: synthetic.id },
+                  )
+                }
+                onClose={() => setOpenCluster(null)}
+              />
+            );
+          })}
+
+        {width > 0 &&
+          visibleClusters.map((cluster) => {
+            const isOpen = openCluster?.clusterId === cluster.id;
+            const isHovered = hoveredCluster === cluster.id || isOpen;
+            return (
+              <ClusterPill
+                key={cluster.id}
+                cluster={cluster}
+                hovered={isHovered}
+                isOpen={isOpen}
+                highlightStop={stopInClusterId === cluster.id}
+                onMouseEnter={() => setHoveredCluster(cluster.id)}
+                onMouseLeave={() => setHoveredCluster(null)}
+                onClick={() =>
+                  setOpenCluster(isOpen ? null : { clusterId: cluster.id })
+                }
+                onClose={() => setOpenCluster(null)}
+              />
+            );
+          })}
+      </div>
+
+      <div />
+    </div>
+  );
+}
+
+// Half of the size-6 icon — used to offset the wrapper so the icon's center
+// (not its left edge) lands on the event's date.
+const EVENT_ICON_HALF_PX = 12;
+
+function EventMarker({
+  event,
+  hideLabel,
+  highlighted,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  event: EventItem;
+  hideLabel: boolean;
+  highlighted: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
+  const { xScale } = useTimeline();
+  const meta = CATEGORY_META[event.category];
+  const Icon =
+    event.pairKind === "stop" ? Ban : categoryIcon(event.category);
+  const left = xScale(event.date);
+  const { verb, subject } = parseEventTitle(event.title, event.pairKind);
+
+  return (
+    <div
+      className="absolute top-1/2 flex items-center gap-2"
+      style={{
+        left: left - EVENT_ICON_HALF_PX,
+        transform: "translateY(-50%)",
+      }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <span
+        className="relative flex size-6 shrink-0 items-center justify-center rounded-full transition"
+        style={{
+          background: highlighted ? meta.color : meta.bg,
+          color: highlighted ? "#fff" : meta.color,
+          boxShadow: highlighted ? `0 0 0 3px ${meta.color}33` : "none",
+        }}
+      >
+        <Icon className="size-3.5" />
+      </span>
+
+      {!hideLabel && (
+        <div className="pointer-events-none whitespace-nowrap leading-[1.15]">
+          {verb && (
+            <div className="text-[11px] font-medium text-slate-500">
+              {verb}
+            </div>
+          )}
+          <div className="text-[12px] font-semibold text-slate-800">
+            {subject}
+          </div>
+        </div>
+      )}
+
+      {highlighted && (event.pairId || hideLabel) && (
+        <div className="pointer-events-none absolute left-0 bottom-full z-20 mb-2 whitespace-nowrap">
+          {event.pairId ? (
+            <PairTooltip event={event} />
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 shadow-md">
+              {verb ? `${verb} ` : ""}
+              {subject}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PairTooltip({ event }: { event: EventItem }) {
+  const { subject } = parseEventTitle(event.title, event.pairKind);
+  const today = Date.now();
+  if (event.endDate) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-700 shadow-md whitespace-nowrap">
+        <span className="font-semibold text-slate-800">{subject}</span> ·{" "}
+        {formatDateTiny(event.date < event.endDate ? event.date : event.endDate)} →{" "}
+        {formatDateTiny(event.date < event.endDate ? event.endDate : event.date)} ·{" "}
+        {daysBetween(event.date, event.endDate)} days
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-700 shadow-md whitespace-nowrap">
+      <span className="font-semibold text-slate-800">{subject}</span> · started{" "}
+      {formatDateTiny(event.date)} · ongoing · {daysBetween(event.date, today)} days
+    </div>
+  );
+}
+
+/* -------------------------- Cluster pill -------------------------- */
+
+function ClusterPill({
+  cluster,
+  hovered,
+  isOpen,
+  highlightStop,
+  onMouseEnter,
+  onMouseLeave,
+  onClick,
+  onClose,
+}: {
+  cluster: Cluster;
+  hovered: boolean;
+  isOpen: boolean;
+  highlightStop: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onClick: () => void;
+  onClose: () => void;
+}) {
+  const { xScale } = useTimeline();
+  const meta = CATEGORY_META[cluster.category];
+  const Icon = categoryIcon(cluster.category);
+  const left = xScale(cluster.date);
+  const sorted = [...cluster.events].sort((a, b) => a.date - b.date);
+
+  return (
+    <div
+      className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+      style={{ left }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="relative">
+        <button
+          onClick={onClick}
+          className="relative flex h-6 items-center rounded-full px-2.5 text-[11px] font-bold shadow-sm transition"
+          style={{
+            background: meta.pillBg,
+            color: meta.pillText,
+            boxShadow:
+              hovered || highlightStop || isOpen
+                ? `0 0 0 4px ${meta.pillBg}33`
+                : "0 1px 2px rgba(0,0,0,0.08)",
+            transform: hovered || isOpen ? "scale(1.04)" : undefined,
+          }}
+        >
+          +{cluster.events.length}
+        </button>
+
+        {hovered && !isOpen && (
+          <div className="pointer-events-none absolute left-1/2 bottom-full z-10 mb-2 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md">
+            <div className="mb-1.5 flex items-center gap-1.5 whitespace-nowrap">
+              <span
+                className="flex size-4 items-center justify-center rounded-sm"
+                style={{ background: meta.bg, color: meta.color }}
+              >
+                <Icon className="size-2.5" />
+              </span>
+              <span className="text-[10.5px] font-semibold text-slate-700">
+                {meta.label}
+              </span>
+              <span className="text-[10.5px] text-slate-400">·</span>
+              <span className="text-[10.5px] text-slate-500">
+                {cluster.events.length} events
+              </span>
+            </div>
+            <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-[11px]">
+              {sorted.map((e) => {
+                const { verb, subject } = parseEventTitle(e.title, e.pairKind);
+                return (
+                  <div key={e.key} className="contents">
+                    <span className="whitespace-nowrap text-slate-500 tabular-nums">
+                      {formatDateTiny(e.date)}
+                    </span>
+                    <span className="whitespace-nowrap font-medium text-slate-800">
+                      {verb ? `${verb} ` : ""}
+                      {subject}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {highlightStop && (
+              <div
+                className="mt-2 rounded-md px-1.5 py-1 text-[10px] font-medium"
+                style={{ background: meta.bg, color: meta.color }}
+              >
+                Contains matching stop event
+              </div>
+            )}
+          </div>
+        )}
+
+        {isOpen && (
+          <div className="absolute left-1/2 bottom-full z-20 mb-3 w-[300px] -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+            <div className="mb-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className="flex size-6 items-center justify-center rounded-md"
+                  style={{ background: meta.bg, color: meta.color }}
+                >
+                  <Icon className="size-3.5" />
+                </span>
+                <span className="text-[13px] font-semibold text-slate-900">
+                  {meta.label}
+                </span>
+                <span className="text-slate-300">·</span>
+                <span className="text-[12px] text-slate-500">
+                  {cluster.events.length} events
+                </span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                className="rounded p-0.5 text-slate-400 hover:bg-slate-100"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+            <ul className="flex flex-col gap-1.5 text-[12px]">
+              {sorted.map((e) => {
+                const { verb, subject } = parseEventTitle(e.title, e.pairKind);
+                return (
+                  <li key={e.key} className="flex items-center gap-2.5">
+                    <span
+                      className="size-1.5 shrink-0 rounded-full"
+                      style={{ background: meta.color }}
+                    />
+                    <span className="w-[78px] shrink-0 text-slate-500 tabular-nums">
+                      {formatDateShort(e.date)}
+                    </span>
+                    <span className="font-medium text-slate-800">
+                      {verb ? `${verb} ` : ""}
+                      {subject}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <button
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11.5px] font-medium transition hover:brightness-95"
+              style={{
+                color: meta.color,
+                borderColor: meta.border,
+                background: meta.bg,
+              }}
+            >
+              View all {meta.label.toLowerCase()} events
+              <ArrowRight className="size-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
