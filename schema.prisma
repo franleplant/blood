@@ -48,6 +48,9 @@ model Event {
   end_date    DateTime?
   title       String
   description String
+  // One of: medications, supplements, lifestyle, nutrition, sleep, training.
+  // Not enforced by a CHECK constraint — keep values aligned with this list.
+  category    String
 
   // Foreign key and relation
   user_id Int
