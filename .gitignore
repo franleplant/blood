@@ -122,5 +122,8 @@ site
 
 # Dist and temp folders
 dist/
-.temp/ 
+.temp/
 /src/generated/prisma
+
+# Soft-delete bin: instead of `rm`, we move files here.
+trash/

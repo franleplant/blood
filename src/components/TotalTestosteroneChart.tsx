@@ -43,8 +43,7 @@ async function getTotalTestosteroneData(userId: number) {
           date: new Date(row.date).getTime(),
           value,
         };
-      } catch (error) {
-        // Skip invalid values
+      } catch {
         return null;
       }
     })

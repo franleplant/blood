@@ -14,3 +14,11 @@ Index of project documentation for AI coding agents (and humans). Each entry bel
 - One topic per file, kebab-case filename, `.md` extension, place under `docs/`.
 - Add a one-line entry above with `[docs/<file>](docs/<file>) — <what it covers>`.
 - Keep this index short — the *contents* go in the linked file, not here.
+
+## Discarding files
+
+Instead of removing files, move them to the `trash/` directory at the repo root. `trash/` is gitignored, so soft-deleted files don't pollute history but stay recoverable on disk until you clean up manually.
+
+```
+mv path/to/junk.csv trash/
+```

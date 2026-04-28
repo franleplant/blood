@@ -1,13 +1,9 @@
-import { exec } from "child_process"; // For running CLI commands
 import { parse } from "csv-parse";
 import fs from "fs/promises";
 import path from "path";
 import * as sqlite from "sqlite";
 import sqlite3Driver from "sqlite3"; // Driver for the sqlite package
 import { fileURLToPath } from "url";
-import { promisify } from "util"; // For promisifying exec
-
-const execAsync = promisify(exec); // Promisify exec
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,7 +47,7 @@ async function main() {
   // Check if CSV file exists
   try {
     await fs.access(csvFilePath);
-  } catch (error) {
+  } catch {
     console.error(`❌ CSV file not found: ${csvFilePath}`);
     process.exit(1);
   }
@@ -255,7 +251,7 @@ WHERE existing.id IS NULL;`;
     // Clean up temporary indexes
     try {
       await db.exec(`DROP INDEX IF EXISTS idx_temp_duplicate_check;`);
-    } catch (dropError) {
+    } catch {
       // Ignore errors when dropping temp index
     }
 

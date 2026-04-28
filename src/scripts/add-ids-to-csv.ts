@@ -96,14 +96,11 @@ async function addIdsToCsv(csvFilePath: string) {
     ? headerRow.filter((col) => col !== "id")
     : headerRow;
 
-  // Add or replace UUID id column to each record
-  const recordsWithIds = records.map((record) => {
-    const { id, ...rest } = record; // Remove existing id if present
-    return {
-      id: randomUUID(),
-      ...rest,
-    };
-  });
+  // Replace any existing id with a fresh UUID (spread first, then override).
+  const recordsWithIds = records.map((record) => ({
+    ...record,
+    id: randomUUID(),
+  }));
 
   // Use header columns in order, with id first
   const columnsWithId = ["id", ...columnsWithoutId];
@@ -111,9 +108,9 @@ async function addIdsToCsv(csvFilePath: string) {
   // Ensure all records have all columns (fill missing ones with empty string)
   const normalizedRecords = recordsWithIds.map((record) => {
     const normalized: Record<string, string> = {};
-    const recordAny = record as Record<string, any>;
+    const indexable: Record<string, string | undefined> = record;
     for (const col of columnsWithId) {
-      normalized[col] = recordAny[col] || "";
+      normalized[col] = indexable[col] || "";
     }
     return normalized;
   });
