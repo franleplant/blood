@@ -2,10 +2,6 @@ import { randomUUID } from "crypto";
 import { parse } from "csv-parse";
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Helper function to escape CSV fields
 function escapeCsvField(field: string | null | undefined): string {
@@ -100,14 +96,11 @@ async function addIdsToCsv(csvFilePath: string) {
     ? headerRow.filter((col) => col !== "id")
     : headerRow;
 
-  // Add or replace UUID id column to each record
-  const recordsWithIds = records.map((record) => {
-    const { id, ...rest } = record; // Remove existing id if present
-    return {
-      id: randomUUID(),
-      ...rest,
-    };
-  });
+  // Replace any existing id with a fresh UUID (spread first, then override).
+  const recordsWithIds = records.map((record) => ({
+    ...record,
+    id: randomUUID(),
+  }));
 
   // Use header columns in order, with id first
   const columnsWithId = ["id", ...columnsWithoutId];
@@ -115,9 +108,9 @@ async function addIdsToCsv(csvFilePath: string) {
   // Ensure all records have all columns (fill missing ones with empty string)
   const normalizedRecords = recordsWithIds.map((record) => {
     const normalized: Record<string, string> = {};
-    const recordAny = record as Record<string, any>;
+    const indexable: Record<string, string | undefined> = record;
     for (const col of columnsWithId) {
-      normalized[col] = recordAny[col] || "";
+      normalized[col] = indexable[col] || "";
     }
     return normalized;
   });
@@ -131,18 +124,28 @@ async function addIdsToCsv(csvFilePath: string) {
 }
 
 async function main() {
-  const csvFiles = [
-    path.resolve(__dirname, "../../historiclabdata.csv"),
-    path.resolve(__dirname, "../../historiclabdata_2025-10-28_from_pdfs.csv"),
-  ];
+  const args = process.argv.slice(2);
+
+  if (args.length === 0) {
+    console.error("❌ Error: at least one CSV file path is required.");
+    console.error("Usage: tsx src/scripts/add-ids-to-csv.ts <csv-file> [<csv-file> ...]");
+    console.error("Example: tsx src/scripts/add-ids-to-csv.ts docs/labs/extracted/2026-04-15__hospital-italiano.csv");
+    process.exit(1);
+  }
+
+  const csvFiles = args.map((arg) =>
+    path.isAbsolute(arg) ? arg : path.resolve(process.cwd(), arg)
+  );
 
   console.log("🔄 Adding UUID id column to CSV files...");
 
+  let failures = 0;
   for (const csvFile of csvFiles) {
     try {
       await fs.access(csvFile);
       await addIdsToCsv(csvFile);
     } catch (error) {
+      failures++;
       console.error(
         `   ❌ Error processing ${csvFile}:`,
         (error as Error).message
@@ -151,6 +154,9 @@ async function main() {
   }
 
   console.log("\n🎉 Done!");
+  if (failures > 0) {
+    process.exit(1);
+  }
 }
 
 main().catch((error) => {

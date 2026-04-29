@@ -1,11 +1,16 @@
 import { openDatabase } from "@/lib/db";
 import normalizeUnits from "@/lib/normalize_units";
-import type { Event } from "../generated/prisma";
 import UricAcidChartClient from "./UricAcidChartClient";
 
 type ChartData = {
   date: Date;
   value: number;
+};
+
+type EventData = {
+  date: Date;
+  title: string;
+  description: string;
 };
 
 async function getUricAcidData(): Promise<ChartData[]> {
@@ -41,13 +46,18 @@ async function getUricAcidData(): Promise<ChartData[]> {
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
-async function getAllEvents(): Promise<Event[]> {
+async function getAllEvents(): Promise<EventData[]> {
   const { prisma } = await openDatabase();
-  return await prisma.event.findMany({
+  const events = await prisma.event.findMany({
     orderBy: {
-      date: "desc",
+      start_date: "desc",
     },
   });
+  return events.map((event) => ({
+    date: new Date(event.start_date),
+    title: event.title,
+    description: event.description,
+  }));
 }
 
 export default async function UricAcidChart({

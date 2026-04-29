@@ -121,12 +121,6 @@ async function normalizeDecimalSeparators() {
   }
 }
 
-// Helper function to validate that a string is a valid number after normalization
-function isValidNumber(value: string): boolean {
-  const num = parseFloat(value);
-  return !isNaN(num) && isFinite(num);
-}
-
 // Run the script
 normalizeDecimalSeparators().catch((error) => {
   console.error("Unhandled error:", error);

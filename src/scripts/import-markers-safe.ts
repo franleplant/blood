@@ -1,13 +1,9 @@
-import { exec } from "child_process"; // For running CLI commands
 import { parse } from "csv-parse";
 import fs from "fs/promises";
 import path from "path";
 import * as sqlite from "sqlite";
 import sqlite3Driver from "sqlite3"; // Driver for the sqlite package
 import { fileURLToPath } from "url";
-import { promisify } from "util"; // For promisifying exec
-
-const execAsync = promisify(exec); // Promisify exec
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,7 +47,7 @@ async function main() {
   // Check if CSV file exists
   try {
     await fs.access(csvFilePath);
-  } catch (error) {
+  } catch {
     console.error(`❌ CSV file not found: ${csvFilePath}`);
     process.exit(1);
   }
@@ -252,11 +248,13 @@ WHERE existing.id IS NULL;`;
     const insertedCount = insertResult.changes || 0;
     console.log(`✅ Inserted ${insertedCount} new rows in ${queryDuration}ms.`);
 
-    // Clean up temporary indexes
+    // Clean up temporary indexes (both — leaving idx_existing_duplicate_check
+    // behind makes Prisma report drift on the next migration).
     try {
       await db.exec(`DROP INDEX IF EXISTS idx_temp_duplicate_check;`);
-    } catch (dropError) {
-      // Ignore errors when dropping temp index
+      await db.exec(`DROP INDEX IF EXISTS idx_existing_duplicate_check;`);
+    } catch {
+      // Ignore errors when dropping temp indexes
     }
 
     const skippedCount = tempRowCount - insertedCount;
