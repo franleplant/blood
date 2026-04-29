@@ -127,3 +127,6 @@ dist/
 
 # Soft-delete bin: instead of `rm`, we move files here.
 trash/
+
+# Local artifacts from the playwright-cli skill (ad-hoc browser snapshots).
+.playwright-cli/

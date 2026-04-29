@@ -10,7 +10,9 @@ import {
   CircleDot,
   Droplet,
   Dumbbell,
+  Filter,
   FlaskConical,
+  Heart,
   LayoutGrid,
   Leaf,
   MoreHorizontal,
@@ -20,6 +22,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Star,
+  TestTube,
   TrendingDown,
   TrendingUp,
   TriangleAlert,
@@ -33,6 +36,7 @@ import {
   CATEGORY_ORDER,
   type Cluster,
   type DashboardData,
+  DEFAULT_HIDDEN_CATEGORIES,
   type DenseRegion,
   daysBetween,
   type EventCategory,
@@ -40,7 +44,12 @@ import {
   formatDateShort,
   formatDateTiny,
   type Marker,
+  MARKER_CATEGORIES,
+  type MarkerCategory,
+  MARKER_CATEGORY_LABELS,
+  MARKER_CATEGORY_ORDER,
   parseEventTitle,
+  type SidebarCounts,
 } from "./dashboard-data";
 import { TimelineMarkerChart } from "./timeline/chart";
 import { TimelineProvider, useTimeline } from "./timeline/context";
@@ -138,6 +147,56 @@ export default function Dashboard({ data }: { data: DashboardData }) {
     return all.filter((_, i) => i % step === 0);
   }, [visibleRange]);
 
+  const filteredMarkers = useMemo(() => {
+    const all = data.markers;
+    const defaultVisible = all.filter(
+      (m) =>
+        !DEFAULT_HIDDEN_CATEGORIES.includes(
+          MARKER_CATEGORIES[m.id] ?? "metabolic",
+        ),
+    );
+    switch (activeFilter) {
+      case "all":
+        return defaultVisible;
+      case "out-of-range":
+        return defaultVisible.filter(
+          (m) =>
+            m.status === "Borderline" ||
+            m.status === "High" ||
+            m.status === "Low",
+        );
+      case "derived":
+        return defaultVisible.filter((m) => m.derived);
+      case "raw":
+        return defaultVisible.filter((m) => !m.derived);
+      case "improving": {
+        const ids = new Set(data.trendIds.improving);
+        return defaultVisible.filter((m) => ids.has(m.id));
+      }
+      case "worsening": {
+        const ids = new Set(data.trendIds.worsening);
+        return defaultVisible.filter((m) => ids.has(m.id));
+      }
+      case "most-changed": {
+        const ids = new Set(data.trendIds.mostChanged);
+        return defaultVisible.filter((m) => ids.has(m.id));
+      }
+    }
+    if ((MARKER_CATEGORY_ORDER as string[]).includes(activeFilter)) {
+      // Category clicks bypass the default-hidden filter so users can still
+      // reach "Blood Count" etc. from the sidebar.
+      return all.filter(
+        (m) => MARKER_CATEGORIES[m.id] === (activeFilter as MarkerCategory),
+      );
+    }
+    return defaultVisible;
+  }, [activeFilter, data.markers, data.trendIds]);
+
+  const dataForView = useMemo(
+    () => ({ ...data, markers: filteredMarkers }),
+    [data, filteredMarkers],
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="flex flex-col">
@@ -147,12 +206,13 @@ export default function Dashboard({ data }: { data: DashboardData }) {
               activeFilter={activeFilter}
               setActiveFilter={setActiveFilter}
               counts={data.sidebarCounts}
+              categoryCounts={data.markerCategoryCounts}
               onHide={() => setSidebarOpen(false)}
             />
           )}
           <div className="flex-1 min-w-0">
             <MainPanel
-              data={data}
+              data={dataForView}
               visibleRange={visibleRange}
               monthTicks={monthTicks}
               sidebarOpen={sidebarOpen}
@@ -183,11 +243,13 @@ function Sidebar({
   activeFilter,
   setActiveFilter,
   counts,
+  categoryCounts,
   onHide,
 }: {
   activeFilter: string;
   setActiveFilter: (id: string) => void;
-  counts: { all: number; outOfRange: number; derived: number; raw: number };
+  counts: SidebarCounts;
+  categoryCounts: Record<MarkerCategory, number>;
   onHide: () => void;
 }) {
   const quickFilters: {
@@ -200,19 +262,11 @@ function Sidebar({
   }[] = [
     {
       id: "all",
-      label: "All Markers",
+      label: "Overview",
       count: counts.all,
       Icon: LayoutGrid,
       iconBg: "#dbeafe",
       iconColor: "#2563eb",
-    },
-    {
-      id: "favorites",
-      label: "Favorites",
-      count: 0,
-      Icon: Star,
-      iconBg: "#fef3c7",
-      iconColor: "#d97706",
     },
     {
       id: "out-of-range",
@@ -225,7 +279,7 @@ function Sidebar({
     {
       id: "improving",
       label: "Improving",
-      count: 0,
+      count: counts.improving,
       Icon: TrendingUp,
       iconBg: "#dcfce7",
       iconColor: "#16a34a",
@@ -233,7 +287,7 @@ function Sidebar({
     {
       id: "worsening",
       label: "Worsening",
-      count: 0,
+      count: counts.worsening,
       Icon: TrendingDown,
       iconBg: "#fee2e2",
       iconColor: "#dc2626",
@@ -241,7 +295,7 @@ function Sidebar({
     {
       id: "most-changed",
       label: "Most Changed",
-      count: 0,
+      count: counts.mostChanged,
       Icon: Zap,
       iconBg: "#fef3c7",
       iconColor: "#ca8a04",
@@ -264,17 +318,22 @@ function Sidebar({
     },
   ];
 
-  const categories: {
-    id: string;
-    label: string;
-    count: number;
-    Icon: typeof Activity;
-  }[] = [
-    { id: "metabolic", label: "Metabolic", count: 0, Icon: Activity },
-    { id: "blood-sugar", label: "Blood Sugar", count: 0, Icon: Droplet },
-    { id: "lipids", label: "Lipids", count: 0, Icon: CircleDot },
-    { id: "hormones", label: "Hormones", count: 0, Icon: Sparkles },
-  ];
+  const CATEGORY_ICONS: Record<MarkerCategory, typeof Activity> = {
+    metabolic: Activity,
+    "blood-sugar": Droplet,
+    lipids: CircleDot,
+    liver: TestTube,
+    kidney: Filter,
+    blood: Heart,
+    nutrients: Leaf,
+    hormones: Sparkles,
+  };
+  const categories = MARKER_CATEGORY_ORDER.map((id) => ({
+    id,
+    label: MARKER_CATEGORY_LABELS[id],
+    count: categoryCounts[id] ?? 0,
+    Icon: CATEGORY_ICONS[id],
+  })).filter((c) => c.count > 0);
 
   return (
     <aside className="w-[244px] shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -338,19 +397,41 @@ function Sidebar({
         <ChevronDown className="size-3.5 text-slate-400" />
       </div>
       <ul className="flex flex-col gap-0.5">
-        {categories.map(({ id, label, count, Icon }) => (
-          <li key={id}>
-            <button className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50">
-              <span className="flex size-7 items-center justify-center rounded-md bg-slate-100 text-slate-500">
-                <Icon className="size-4" />
-              </span>
-              <span className="flex-1 text-left">{label}</span>
-              <span className="min-w-6 rounded-md bg-slate-100 px-1.5 py-0.5 text-center text-[11px] font-semibold text-slate-600">
-                {count}
-              </span>
-            </button>
-          </li>
-        ))}
+        {categories.map(({ id, label, count, Icon }) => {
+          const selected = id === activeFilter;
+          return (
+            <li key={id}>
+              <button
+                onClick={() => setActiveFilter(id)}
+                className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition ${
+                  selected
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span
+                  className={`flex size-7 items-center justify-center rounded-md ${
+                    selected
+                      ? "bg-blue-100 text-blue-600"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  <Icon className="size-4" />
+                </span>
+                <span className="flex-1 text-left font-medium">{label}</span>
+                <span
+                  className={`min-w-6 rounded-md px-1.5 py-0.5 text-center text-[11px] font-semibold ${
+                    selected
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </aside>
   );
@@ -461,7 +542,7 @@ function Header({
           <span className="flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-600">
             <span className="text-[11px] font-bold">A↗</span>
           </span>
-          All Markers
+          Overview
           <span className="min-w-5 rounded-md bg-slate-100 px-1.5 py-0.5 text-center text-[11px] font-semibold text-slate-600">
             {markerCount}
           </span>
