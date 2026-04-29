@@ -21,6 +21,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "labs:ingest": "claude -p \"$(cat docs/labs/INGEST_PROMPT.md)\"",
     "labs:status": "cat docs/labs/INGESTED.md"
   },
