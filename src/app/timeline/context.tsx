@@ -30,6 +30,9 @@ export interface TimelineEngine {
   /** Pixel width of the chart column. 0 until the first ResizeObserver tick. */
   width: number;
 
+  /** Left edge of the chart column, relative to the timeline surface. */
+  chartLeft: number;
+
   /** ms → px in [0, width]. */
   xScale: ScaleTime<number, number>;
 
@@ -72,6 +75,7 @@ export function TimelineProvider({
   children: React.ReactNode;
 }) {
   const [width, setWidth] = useState(0);
+  const [chartLeft, setChartLeft] = useState(0);
   const [hoveredMs, setHoveredMs] = useState<number | null>(null);
   const [pinnedMs, setPinnedMs] = useState<number | null>(null);
 
@@ -88,6 +92,11 @@ export function TimelineProvider({
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? 0;
       setWidth(Math.max(0, Math.round(w)));
+      const parent = el.offsetParent instanceof HTMLElement ? el.offsetParent : null;
+      const left = parent
+        ? el.getBoundingClientRect().left - parent.getBoundingClientRect().left
+        : el.offsetLeft;
+      setChartLeft(Math.max(0, Math.round(left)));
     });
     ro.observe(el);
     observer.current = ro;
@@ -121,6 +130,7 @@ export function TimelineProvider({
     () => ({
       domain,
       width,
+      chartLeft,
       xScale,
       hoveredMs,
       setHoveredMs,
@@ -129,7 +139,7 @@ export function TimelineProvider({
       measureRef,
       msFromClientX,
     }),
-    [domain, width, xScale, hoveredMs, pinnedMs, measureRef, msFromClientX],
+    [domain, width, chartLeft, xScale, hoveredMs, pinnedMs, measureRef, msFromClientX],
   );
 
   return (
