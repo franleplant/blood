@@ -128,9 +128,19 @@ export function DataTable<TData, TValue>({
         })}
       </div>
 
-      {mdUp === null ? (
-        <div className="h-24" />
-      ) : mdUp ? (
+      {mdUp !== true && (
+        <ul className="flex flex-col divide-y divide-slate-100 md:hidden">
+          {rows.length ? (
+            rows.map((row) => <MarkerCard key={row.id} row={row} />)
+          ) : (
+            <li className="px-3 py-10 text-center text-sm text-slate-500">
+              No results.
+            </li>
+          )}
+        </ul>
+      )}
+      {mdUp !== false && (
+      <div className={mdUp === true ? undefined : "hidden md:block"}>
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
           {table.getHeaderGroups().map((headerGroup) => (
@@ -187,16 +197,7 @@ export function DataTable<TData, TValue>({
           )}
         </TableBody>
       </Table>
-      ) : (
-        <ul className="flex flex-col divide-y divide-slate-100">
-          {rows.length ? (
-            rows.map((row) => <MarkerCard key={row.id} row={row} />)
-          ) : (
-            <li className="px-3 py-10 text-center text-sm text-slate-500">
-              No results.
-            </li>
-          )}
-        </ul>
+      </div>
       )}
     </section>
   );
@@ -245,11 +246,15 @@ function MarkerCard<TData>({ row }: { row: Row<TData> }) {
           ) : null}
         </div>
         <div className="shrink-0 text-right">
-          {renderCell(row, "value")}
-          <div className="text-xs text-slate-500">{renderCell(row, "unit")}</div>
+          <div className="text-sm font-semibold tabular-nums text-slate-900 [&_div]:text-sm [&_div]:font-semibold">
+            {renderCell(row, "value")}
+          </div>
+          {row.getValue("unit") ? (
+            <div className="text-xs text-slate-500">{renderCell(row, "unit")}</div>
+          ) : null}
         </div>
       </div>
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-slate-500">
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
         {renderCell(row, "date")}
         {reference ? (
           <span className="inline-flex items-baseline gap-1">

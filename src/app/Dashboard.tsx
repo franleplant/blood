@@ -597,8 +597,8 @@ function Header({
   markerCount: number;
 }) {
   return (
-    <div className="flex flex-col gap-2.5 border-b border-slate-200 px-3 py-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-start lg:gap-x-3 lg:gap-y-2 lg:px-5 xl:justify-between">
-      <div className="hidden shrink-0 items-center gap-3 lg:flex">
+    <div className="flex flex-col gap-2.5 border-b border-slate-200 px-3 py-3 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:overflow-x-clip lg:px-5">
+      <div className="hidden items-center gap-3 lg:flex">
         {!sidebarOpen && (
           <button
             onClick={onShowSidebar}
@@ -620,7 +620,7 @@ function Header({
         </button>
       </div>
 
-      <div className="flex w-full shrink-0 items-stretch gap-1 overflow-x-auto rounded-lg bg-slate-100 p-0.5 lg:w-auto lg:items-center lg:overflow-visible">
+      <div className="flex w-full items-stretch gap-1 overflow-x-auto rounded-lg bg-slate-100 p-0.5 lg:w-auto lg:shrink-0 lg:items-center lg:overflow-visible">
         {TIME_RANGES.map((r) => (
           <button
             key={r}
@@ -638,7 +638,7 @@ function Header({
         ))}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           aria-pressed={compareOn}
@@ -863,7 +863,7 @@ function MarkerRow({
             {marker.derived ? "(derived)" : marker.unit}
           </div>
           {optimalRows.length > 0 && (
-            <div className="mt-0.5 text-[11px] font-medium leading-snug text-emerald-600 lg:hidden">
+            <div className="mt-0.5 text-[11px] font-medium text-emerald-600 lg:hidden">
               {optimalRows.map((row) => (
                 <div key={row.text}>Optimal {row.text}</div>
               ))}
@@ -1384,7 +1384,10 @@ function EventMarker({
     event.pairKind === "stop" ? Ban : categoryIcon(event.category);
   const left = xScale(event.date);
   const { verb, subject } = parseEventTitle(event.title, event.pairKind);
-  const alignRight = width > 0 && width < 1024 && left > width * 0.62;
+  const narrow = useNarrowScreen();
+  // Flip only below lg. Chart width is also under 1024px on a desktop row,
+  // so using it here would move tooltips that the wide layout already fit.
+  const alignRight = narrow && width > 0 && left > width * 0.62;
   const pointerKind = useRef("");
   // Below lg the printed title is display:none, so the tooltip is the only
   // name. On lg+, keep the old rule: a tooltip only when the title is hidden
@@ -1461,7 +1464,7 @@ function EventMarker({
 
       {highlighted && (
         <div
-          className={`pointer-events-none absolute bottom-full z-20 mb-2 w-max max-w-[min(16rem,calc(100vw-1.5rem))] whitespace-normal ${
+          className={`pointer-events-none absolute bottom-full z-20 mb-2 w-max whitespace-nowrap max-lg:max-w-[min(16rem,calc(100vw-1.5rem))] max-lg:whitespace-normal ${
             desktopTooltip ? "" : "lg:hidden"
           } ${alignRight ? "right-0" : "left-0"}`}
         >
@@ -1471,7 +1474,7 @@ function EventMarker({
             <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 shadow-md">
               {verb ? `${verb} ` : ""}
               {subject}
-              <span className="font-normal text-slate-500">
+              <span className="font-normal text-slate-500 lg:hidden">
                 {" "}
                 · {formatDateTiny(event.date)}
               </span>
@@ -1735,7 +1738,10 @@ function ClusterPill({
           aria-haspopup="dialog"
           aria-label={`${cluster.events.length} ${meta.label} events`}
           onClick={(e) => {
-            e.stopPropagation();
+            const native = e.nativeEvent;
+            if ("pointerType" in native && native.pointerType === "touch") {
+              e.stopPropagation();
+            }
             onClick();
           }}
           className="relative flex h-11 min-w-11 items-center justify-center rounded-full px-3 text-xs font-bold shadow-sm transition lg:h-6 lg:min-w-0 lg:px-2.5 lg:text-[11px]"
