@@ -1,6 +1,6 @@
 "use client";
 
-import { type MouseEvent, type ReactNode } from "react";
+import { type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { useTimeline } from "./context";
 
 /**
@@ -25,8 +25,16 @@ export function TimelineSurface({
 }) {
   const { msFromClientX, setHoveredMs, pinnedMs, setPinnedMs } = useTimeline();
 
-  const handleMove = (e: MouseEvent) => {
+  // Mouse and pen get a live crosshair. Touch skips move so a vertical
+  // scroll isn't treated as a hover, and a tap pins the crosshair instead.
+  const handlePointerMove = (e: PointerEvent) => {
+    if (e.pointerType === "touch") return;
     setHoveredMs(msFromClientX(e.clientX));
+  };
+
+  const handlePointerLeave = (e: PointerEvent) => {
+    if (e.pointerType === "touch") return;
+    setHoveredMs(null);
   };
 
   const handleClick = (e: MouseEvent) => {
@@ -42,9 +50,9 @@ export function TimelineSurface({
 
   return (
     <div
-      className={`relative ${className ?? ""}`}
-      onMouseMove={handleMove}
-      onMouseLeave={() => setHoveredMs(null)}
+      className={`relative touch-pan-y ${className ?? ""}`}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
       onClick={handleClick}
     >
       {children}
@@ -61,23 +69,17 @@ export function TimelineSurface({
  *
  * pointer-events: none so it doesn't block events on chart points or icons.
  *
- * Position is derived from `chartLeftPx` (offset from the surface's left edge
- * to the start of the chart column) and the timeline's measured `width`.
+ * Position is derived from the chart column's measured `chartLeft` (offset
+ * from the surface's left edge) and the timeline's measured `width`.
  */
-export function TimelineOverlay({
-  ticks,
-  chartLeftPx,
-}: {
-  ticks: number[];
-  chartLeftPx: number;
-}) {
-  const { xScale, width, hoveredMs, pinnedMs } = useTimeline();
+export function TimelineOverlay({ ticks }: { ticks: number[] }) {
+  const { xScale, width, chartLeft, hoveredMs, pinnedMs } = useTimeline();
   if (width === 0) return null;
 
   return (
     <svg
       className="pointer-events-none absolute inset-y-0"
-      style={{ left: chartLeftPx, width, height: "100%" }}
+      style={{ left: chartLeft, width, height: "100%" }}
       aria-hidden
     >
       {ticks.map((ms) => {

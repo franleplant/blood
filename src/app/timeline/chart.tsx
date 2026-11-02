@@ -180,13 +180,18 @@ function ChartTooltip({
   ms: number;
   color: string;
 }) {
+  const { width } = useTimeline();
+  // Keep the label inside the plot. Near the right edge it flips left;
+  // near the top of a row it flips below the point.
+  const flipX = x > width - 108;
+  const flipY = y < 22;
   return (
     <div
-      className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-slate-700 shadow-sm"
+      className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-slate-700 shadow-sm max-lg:px-2 max-lg:py-1 max-lg:text-xs"
       style={{
         left: x,
         top: y,
-        transform: "translate(8px, -120%)",
+        transform: `translate(${flipX ? "calc(-100% - 8px)" : "8px"}, ${flipY ? "10px" : "-120%"})`,
         borderColor: `${color}66`,
       }}
     >

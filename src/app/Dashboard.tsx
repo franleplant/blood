@@ -29,7 +29,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   buildMonthTicks,
   CATEGORY_META,
@@ -59,11 +60,6 @@ const TIME_RANGES = ["1M", "3M", "6M", "1Y", "2Y", "ALL"] as const;
 type TimeRange = (typeof TIME_RANGES)[number];
 
 const ROW_HEIGHT = 80;
-const LANE_HEIGHT = 44;
-const CHART_LEFT = 130;
-const RANGE_COL = 156;
-const CHART_RIGHT = 128;
-const GRID_COLS = `${CHART_LEFT}px ${RANGE_COL}px 1fr ${CHART_RIGHT}px`;
 
 type HoveredEvent = {
   eventKey: string;
@@ -199,19 +195,24 @@ export default function Dashboard({ data }: { data: DashboardData }) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="flex flex-col">
-        <div className="flex gap-5">
-          {sidebarOpen && (
-            <Sidebar
-              activeFilter={activeFilter}
-              setActiveFilter={setActiveFilter}
-              counts={data.sidebarCounts}
-              categoryCounts={data.markerCategoryCounts}
-              onHide={() => setSidebarOpen(false)}
-            />
-          )}
-          <div className="flex-1 min-w-0">
-            <MainPanel
+      <div className="flex min-w-0 flex-col gap-2 px-2 py-2 lg:flex-row lg:gap-5 lg:p-0">
+        <MobileFilterBar
+          activeFilter={activeFilter}
+          setActiveFilter={setActiveFilter}
+          counts={data.sidebarCounts}
+          categoryCounts={data.markerCategoryCounts}
+        />
+        {sidebarOpen && (
+          <Sidebar
+            activeFilter={activeFilter}
+            setActiveFilter={setActiveFilter}
+            counts={data.sidebarCounts}
+            categoryCounts={data.markerCategoryCounts}
+            onHide={() => setSidebarOpen(false)}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <MainPanel
               data={dataForView}
               visibleRange={visibleRange}
               monthTicks={monthTicks}
@@ -230,36 +231,25 @@ export default function Dashboard({ data }: { data: DashboardData }) {
               clusterByEventKey={clusterByEventKey}
               activePair={activePair}
             />
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/* -------------------------- Sidebar -------------------------- */
+/* -------------------------- Filters -------------------------- */
 
-function Sidebar({
-  activeFilter,
-  setActiveFilter,
-  counts,
-  categoryCounts,
-  onHide,
-}: {
-  activeFilter: string;
-  setActiveFilter: (id: string) => void;
-  counts: SidebarCounts;
-  categoryCounts: Record<MarkerCategory, number>;
-  onHide: () => void;
-}) {
-  const quickFilters: {
-    id: string;
-    label: string;
-    count: number;
-    Icon: typeof Star;
-    iconBg: string;
-    iconColor: string;
-  }[] = [
+type QuickFilter = {
+  id: string;
+  label: string;
+  count: number;
+  Icon: typeof Star;
+  iconBg: string;
+  iconColor: string;
+};
+
+function quickFilters(counts: SidebarCounts): Array<QuickFilter> {
+  return [
     {
       id: "all",
       label: "Overview",
@@ -317,26 +307,107 @@ function Sidebar({
       iconColor: "#4f46e5",
     },
   ];
+}
 
-  const CATEGORY_ICONS: Record<MarkerCategory, typeof Activity> = {
-    metabolic: Activity,
-    "blood-sugar": Droplet,
-    lipids: CircleDot,
-    liver: TestTube,
-    kidney: Filter,
-    blood: Heart,
-    nutrients: Leaf,
-    hormones: Sparkles,
-  };
-  const categories = MARKER_CATEGORY_ORDER.map((id) => ({
+const CATEGORY_ICONS: Record<MarkerCategory, typeof Activity> = {
+  metabolic: Activity,
+  "blood-sugar": Droplet,
+  lipids: CircleDot,
+  liver: TestTube,
+  kidney: Filter,
+  blood: Heart,
+  nutrients: Leaf,
+  hormones: Sparkles,
+};
+
+function categoryFilters(categoryCounts: Record<MarkerCategory, number>) {
+  return MARKER_CATEGORY_ORDER.map((id) => ({
     id,
     label: MARKER_CATEGORY_LABELS[id],
     count: categoryCounts[id] ?? 0,
     Icon: CATEGORY_ICONS[id],
   })).filter((c) => c.count > 0);
+}
+
+function MobileFilterBar({
+  activeFilter,
+  setActiveFilter,
+  counts,
+  categoryCounts,
+}: {
+  activeFilter: string;
+  setActiveFilter: (id: string) => void;
+  counts: SidebarCounts;
+  categoryCounts: Record<MarkerCategory, number>;
+}) {
+  const quick = quickFilters(counts);
+  const categories = categoryFilters(categoryCounts);
+  const chips = [
+    ...quick.map((f) => ({ id: f.id, label: f.label, count: f.count })),
+    ...categories.map((c) => ({ id: c.id, label: c.label, count: c.count })),
+  ];
 
   return (
-    <aside className="w-[244px] shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="min-w-0 lg:hidden">
+      <div className="mb-1.5 px-0.5 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+        FILTERS
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {chips.map(({ id, label, count }, index) => {
+          const selected = id === activeFilter;
+          const divider = index === quick.length;
+          return (
+            <span key={id} className="contents">
+              {divider && (
+                <span className="mx-0.5 w-px shrink-0 self-stretch bg-slate-200" />
+              )}
+              <button
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setActiveFilter(id)}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium ${
+                  selected
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-700"
+                }`}
+              >
+                {label}
+                <span
+                  className={`text-[11px] font-semibold tabular-nums ${
+                    selected ? "text-blue-600" : "text-slate-400"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------- Sidebar -------------------------- */
+
+function Sidebar({
+  activeFilter,
+  setActiveFilter,
+  counts,
+  categoryCounts,
+  onHide,
+}: {
+  activeFilter: string;
+  setActiveFilter: (id: string) => void;
+  counts: SidebarCounts;
+  categoryCounts: Record<MarkerCategory, number>;
+  onHide: () => void;
+}) {
+  const filters = quickFilters(counts);
+  const categories = categoryFilters(categoryCounts);
+
+  return (
+    <aside className="hidden w-[244px] shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:block">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-base font-semibold text-slate-900">Filters</div>
         <button
@@ -351,7 +422,7 @@ function Sidebar({
         QUICK FILTERS
       </div>
       <ul className="flex flex-col gap-0.5">
-        {quickFilters.map(
+        {filters.map(
           ({ id, label, count, Icon, iconBg, iconColor }) => {
             const selected = id === activeFilter;
             return (
@@ -481,7 +552,7 @@ function MainPanel({
     : (["medications", "lifestyle", "nutrition", "sleep"] as EventCategory[]);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm">
       <Header
         sidebarOpen={sidebarOpen}
         onShowSidebar={onShowSidebar}
@@ -527,8 +598,8 @@ function Header({
   markerCount: number;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-2.5 border-b border-slate-200 px-3 py-3 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:px-5">
+      <div className="hidden items-center gap-3 lg:flex">
         {!sidebarOpen && (
           <button
             onClick={onShowSidebar}
@@ -550,12 +621,14 @@ function Header({
         </button>
       </div>
 
-      <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+      <div className="flex w-full items-stretch gap-1 overflow-x-auto rounded-lg bg-slate-100 p-0.5 lg:w-auto lg:items-center">
         {TIME_RANGES.map((r) => (
           <button
             key={r}
+            type="button"
+            aria-pressed={activeRange === r}
             onClick={() => setActiveRange(r)}
-            className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
+            className={`min-h-11 flex-1 rounded-md px-2 text-xs font-semibold transition lg:min-h-0 lg:flex-none lg:px-3 lg:py-1 ${
               activeRange === r
                 ? "bg-white text-slate-900 shadow-sm"
                 : "text-slate-500 hover:text-slate-700"
@@ -568,8 +641,10 @@ function Header({
 
       <div className="flex items-center gap-2">
         <button
+          type="button"
+          aria-pressed={compareOn}
           onClick={() => setCompareOn(!compareOn)}
-          className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:min-h-0 lg:w-auto"
         >
           <SlidersHorizontal className="size-3.5" />
           Compare
@@ -585,11 +660,11 @@ function Header({
             />
           </span>
         </button>
-        <button className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <button className="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:flex">
           <SlidersHorizontal className="size-3.5" />
           View Options
         </button>
-        <button className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50">
+        <button className="hidden rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 lg:inline-flex">
           <MoreHorizontal className="size-4" />
         </button>
       </div>
@@ -614,7 +689,7 @@ function Timeline(props: {
   activePair: EventItem[] | null;
 }) {
   return (
-    <div className="px-5 pt-4 pb-5">
+    <div className="px-3 pb-4 pt-3 lg:px-5 lg:pb-5 lg:pt-4">
       <TimelineProvider domain={props.visibleRange}>
         <TimelineSurface>
           <TimelineBody {...props} />
@@ -652,6 +727,13 @@ function TimelineBody({
   activePair: EventItem[] | null;
 }) {
   const tl = useTimeline();
+  const axisTicks = useMemo(() => {
+    if (tl.width === 0 || tl.width >= 640) return monthTicks;
+    const maxLabels = Math.max(2, Math.floor(tl.width / 72));
+    const stride = Math.max(1, Math.ceil(monthTicks.length / maxLabels));
+    if (stride <= 1) return monthTicks;
+    return monthTicks.filter((_, i) => i % stride === 0);
+  }, [monthTicks, tl.width]);
   const visibleDenseRegions = data.denseRegions.filter(
     (r) => r.end >= visibleRange.start && r.start <= visibleRange.end,
   );
@@ -665,33 +747,38 @@ function TimelineBody({
 
   return (
     <>
-      <div
-        className="grid items-end pb-2"
-        style={{ gridTemplateColumns: GRID_COLS }}
-      >
-        <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+      <div className="dash-grid items-end pb-2">
+        <div className="hidden text-[10px] font-semibold tracking-[0.16em] text-slate-400 lg:block">
           MARKER
         </div>
-        <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+        <div className="hidden text-[10px] font-semibold tracking-[0.16em] text-slate-400 lg:block">
           RANGE
         </div>
-        <div ref={tl.measureRef} className="relative h-5">
+        <div ref={tl.measureRef} className="relative h-5 min-w-0">
           {tl.width > 0 &&
-            monthTicks.map((t) => {
+            axisTicks.map((t) => {
               const x = tl.xScale(t.ms);
               if (x < 0 || x > tl.width) return null;
+              const edge = tl.width < 640;
+              const transform = !edge
+                ? "translateX(-50%)"
+                : x < 32
+                  ? "translateX(0)"
+                  : x > tl.width - 32
+                    ? "translateX(-100%)"
+                    : "translateX(-50%)";
               return (
                 <div
                   key={t.ms}
-                  className="absolute -translate-x-1/2 text-[11px] font-medium text-slate-500"
-                  style={{ left: x }}
+                  className="absolute whitespace-nowrap text-[11px] font-medium text-slate-500"
+                  style={{ left: x, transform }}
                 >
                   {t.label}
                 </div>
               );
             })}
         </div>
-        <div className="pl-3">
+        <div className="hidden pl-3 lg:block">
           <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
             LATEST
           </div>
@@ -710,16 +797,8 @@ function TimelineBody({
         ))}
       </div>
 
-      <div
-        className="mt-4 grid items-center"
-        style={{ gridTemplateColumns: GRID_COLS }}
-      >
-        <div className="text-[10px] font-semibold tracking-[0.16em] text-slate-400">
-          EVENTS
-        </div>
-        <div />
-        <div />
-        <div />
+      <div className="mt-4 text-[10px] font-semibold tracking-[0.16em] text-slate-400">
+        EVENTS
       </div>
 
       <div className="mt-2 flex flex-col">
@@ -743,26 +822,20 @@ function TimelineBody({
       </div>
 
       {data.clusters.length > 0 && (
-        <div
-          className="mt-8 grid items-center"
-          style={{ gridTemplateColumns: GRID_COLS }}
-        >
-          <div />
-          <div />
-          <div className="flex items-center justify-end gap-2 pr-2 text-[11px] text-slate-500">
+        <div className="dash-grid mt-8 items-center">
+          <div className="hidden lg:block" />
+          <div className="hidden lg:block" />
+          <div className="flex items-center justify-start gap-2 text-[11px] text-slate-500 lg:justify-end lg:pr-2">
             <span>Event density</span>
             <span>Low</span>
-            <span className="block h-1.5 w-28 rounded-full bg-gradient-to-r from-violet-100 via-violet-300 to-violet-500" />
+            <span className="block h-1.5 w-28 shrink-0 rounded-full bg-gradient-to-r from-violet-100 via-violet-300 to-violet-500" />
             <span>High</span>
           </div>
-          <div />
+          <div className="hidden lg:block" />
         </div>
       )}
 
-      <TimelineOverlay
-        ticks={monthTicks.map((t) => t.ms)}
-        chartLeftPx={CHART_LEFT + RANGE_COL}
-      />
+      <TimelineOverlay ticks={axisTicks.map((t) => t.ms)} />
     </>
   );
 }
@@ -779,26 +852,40 @@ function MarkerRow({
   isLast: boolean;
 }) {
   const { xScale, width } = useTimeline();
+  const optimal = marker.rangeRows.find((row) => row.tone === "optimal");
   return (
-    <div
-      className="grid items-stretch"
-      style={{
-        gridTemplateColumns: GRID_COLS,
-        height: ROW_HEIGHT,
-      }}
-    >
-      <div className="flex flex-col justify-center pr-3">
-        <div className="text-sm font-semibold text-slate-900">
-          {marker.name}
+    <div className="dash-grid items-stretch max-lg:mb-3">
+      <div className="flex items-start justify-between gap-3 py-2.5 lg:contents">
+        <div className="flex min-w-0 flex-col justify-center lg:h-20 lg:py-0 lg:pr-3">
+          <div className="text-sm font-semibold leading-tight text-slate-900">
+            {marker.name}
+          </div>
+          <div className="text-[11px] text-slate-500">
+            {marker.derived ? "(derived)" : marker.unit}
+          </div>
+          {optimal && (
+            <div className="mt-0.5 text-[11px] font-medium text-emerald-600 lg:hidden">
+              Optimal {optimal.text}
+            </div>
+          )}
         </div>
-        <div className="text-[11px] text-slate-500">
-          {marker.derived ? "(derived)" : marker.unit}
+        <div className="flex shrink-0 flex-col items-end gap-0.5 pt-0.5 lg:hidden">
+          <div className="text-[20px] font-semibold leading-none tabular-nums text-slate-900">
+            {formatLatest(marker.latest)}
+          </div>
+          <div
+            className={`text-[12px] font-medium ${statusColor(marker.status)}`}
+          >
+            {marker.status}
+          </div>
         </div>
       </div>
 
-      <RangeCell marker={marker} />
+      <div className="hidden lg:flex lg:h-20 lg:items-center">
+        <RangeCell marker={marker} />
+      </div>
 
-      <div className="relative">
+      <div className="relative h-20 min-w-0">
         {width > 0 &&
           denseRegions.map((r, i) => {
             const left = xScale(r.start);
@@ -816,6 +903,12 @@ function MarkerRow({
               />
             );
           })}
+        <span className="pointer-events-none absolute left-0.5 top-0.5 z-[1] rounded bg-white/80 px-1 text-[11px] font-medium tabular-nums leading-none text-slate-500 lg:hidden">
+          {formatAxis(marker.yMax)}
+        </span>
+        <span className="pointer-events-none absolute bottom-0.5 left-0.5 z-[1] rounded bg-white/80 px-1 text-[11px] font-medium tabular-nums leading-none text-slate-500 lg:hidden">
+          {formatAxis(marker.yMin)}
+        </span>
         <TimelineMarkerChart
           points={marker.data}
           yDomain={[marker.yMin, marker.yMax]}
@@ -830,7 +923,7 @@ function MarkerRow({
         )}
       </div>
 
-      <div className="flex flex-col items-end justify-center gap-0.5 pl-3">
+      <div className="hidden h-20 flex-col items-end justify-center gap-0.5 pl-3 lg:flex">
         <div className="flex items-center gap-2">
           <div className="text-[20px] font-semibold leading-none text-slate-900">
             {formatLatest(marker.latest)}
@@ -880,6 +973,15 @@ function formatLatest(v: number): string {
   if (Math.abs(v) >= 100) return v.toFixed(0);
   if (Math.abs(v) >= 10) return v.toFixed(1);
   return v.toFixed(2);
+}
+
+function formatAxis(v: number): string {
+  const abs = Math.abs(v);
+  const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
+  return v
+    .toFixed(digits)
+    .replace(/(\.\d*?)0+$/, "$1")
+    .replace(/\.$/, "");
 }
 
 function statusColor(status: string): string {
@@ -1102,15 +1204,20 @@ function EventLane({
 
   return (
     <div
-      className="grid items-stretch"
-      style={{
-        gridTemplateColumns: GRID_COLS,
-        height: LANE_HEIGHT,
-        position: "relative",
-        zIndex: isActiveLane ? 30 : undefined,
-      }}
+      className="relative max-lg:mb-1"
+      style={{ zIndex: isActiveLane ? 30 : undefined }}
     >
-      <div className="flex items-center gap-2 pl-1">
+      <div className="flex items-center gap-2 pb-1 lg:hidden">
+        <span
+          className="flex size-7 items-center justify-center rounded-md"
+          style={{ background: meta.bg, color: meta.color }}
+        >
+          <LaneIcon className="size-3.5" />
+        </span>
+        <span className="text-xs font-medium text-slate-600">{meta.label}</span>
+      </div>
+      <div className="dash-grid h-14 items-stretch lg:h-11">
+      <div className="hidden items-center gap-2 pl-1 lg:flex">
         <span
           className="flex size-6 items-center justify-center rounded-md"
           style={{ background: meta.bg, color: meta.color }}
@@ -1122,9 +1229,9 @@ function EventLane({
         </span>
       </div>
 
-      <div />
+      <div className="hidden lg:block" />
 
-      <div className="relative">
+      <div className="relative min-w-0">
         {width > 0 &&
           denseRegions.map((r, i) => {
             const left = xScale(r.start);
@@ -1172,6 +1279,13 @@ function EventLane({
                     setHoveredEvent({ eventKey: ev.key, pairId: ev.pairId })
                   }
                   onMouseLeave={() => setHoveredEvent(null)}
+                  onTouchToggle={() =>
+                    setHoveredEvent(
+                      hoveredEvent?.eventKey === ev.key
+                        ? null
+                        : { eventKey: ev.key, pairId: ev.pairId },
+                    )
+                  }
                 />
               );
             }
@@ -1224,7 +1338,8 @@ function EventLane({
           })}
       </div>
 
-      <div />
+      <div className="hidden lg:block" />
+      </div>
     </div>
   );
 }
@@ -1239,29 +1354,42 @@ function EventMarker({
   highlighted,
   onMouseEnter,
   onMouseLeave,
+  onTouchToggle,
 }: {
   event: EventItem;
   hideLabel: boolean;
   highlighted: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  onTouchToggle: () => void;
 }) {
-  const { xScale } = useTimeline();
+  const { xScale, width } = useTimeline();
   const meta = CATEGORY_META[event.category];
   const Icon =
     event.pairKind === "stop" ? Ban : categoryIcon(event.category);
   const left = xScale(event.date);
   const { verb, subject } = parseEventTitle(event.title, event.pairKind);
+  const alignRight = width > 0 && width < 640 && left > width * 0.55;
 
   return (
     <div
-      className="absolute top-1/2 flex items-center gap-2"
+      className="absolute top-1/2 flex items-center gap-2 max-lg:-m-2.5 max-lg:p-2.5"
       style={{
         left: left - EVENT_ICON_HALF_PX,
         transform: "translateY(-50%)",
       }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      onPointerEnter={(e) => {
+        if (e.pointerType !== "touch") onMouseEnter();
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType !== "touch") onMouseLeave();
+      }}
+      onClick={(e) => {
+        const native = e.nativeEvent;
+        if (!("pointerType" in native) || native.pointerType !== "touch") return;
+        e.stopPropagation();
+        onTouchToggle();
+      }}
     >
       <span
         className="relative flex size-6 shrink-0 items-center justify-center rounded-full transition"
@@ -1275,7 +1403,7 @@ function EventMarker({
       </span>
 
       {!hideLabel && (
-        <div className="pointer-events-none whitespace-nowrap leading-[1.15]">
+        <div className="pointer-events-none hidden whitespace-nowrap leading-[1.15] lg:block">
           {verb && (
             <div className="text-[11px] font-medium text-slate-500">
               {verb}
@@ -1288,7 +1416,11 @@ function EventMarker({
       )}
 
       {highlighted && (event.pairId || hideLabel) && (
-        <div className="pointer-events-none absolute left-0 bottom-full z-20 mb-2 whitespace-nowrap">
+        <div
+          className={`pointer-events-none absolute bottom-full z-20 mb-2 whitespace-nowrap max-lg:max-w-[min(16rem,calc(100vw-1.5rem))] max-lg:whitespace-normal ${
+            alignRight ? "right-0" : "left-0"
+          }`}
+        >
           {event.pairId ? (
             <PairTooltip event={event} />
           ) : (
@@ -1326,6 +1458,88 @@ function PairTooltip({ event }: { event: EventItem }) {
 
 /* -------------------------- Cluster pill -------------------------- */
 
+function isNarrowScreen(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 1023px)").matches;
+}
+
+function ClusterPanel({
+  cluster,
+  sorted,
+  onClose,
+}: {
+  cluster: Cluster;
+  sorted: Array<EventItem>;
+  onClose: () => void;
+}) {
+  const meta = CATEGORY_META[cluster.category];
+  const Icon = categoryIcon(cluster.category);
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="flex size-6 shrink-0 items-center justify-center rounded-md"
+            style={{ background: meta.bg, color: meta.color }}
+          >
+            <Icon className="size-3.5" />
+          </span>
+          <span className="truncate text-[13px] font-semibold text-slate-900">
+            {meta.label}
+          </span>
+          <span className="text-slate-300">·</span>
+          <span className="shrink-0 text-[12px] text-slate-500">
+            {cluster.events.length} events
+          </span>
+        </div>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-100 lg:size-auto lg:p-0.5"
+        >
+          <X className="size-4 lg:size-3.5" />
+        </button>
+      </div>
+      <ul className="flex flex-col gap-1.5 text-[12px]">
+        {sorted.map((e) => {
+          const { verb, subject } = parseEventTitle(e.title, e.pairKind);
+          return (
+            <li key={e.key} className="flex items-center gap-2.5">
+              <span
+                className="size-1.5 shrink-0 rounded-full"
+                style={{ background: meta.color }}
+              />
+              <span className="shrink-0 whitespace-nowrap text-slate-500 tabular-nums">
+                {formatDateShort(e.date)}
+              </span>
+              <span className="min-w-0 font-medium text-slate-800">
+                {verb ? `${verb} ` : ""}
+                {subject}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <button
+        type="button"
+        className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11.5px] font-medium transition hover:brightness-95 lg:min-h-0"
+        style={{
+          color: meta.color,
+          borderColor: meta.border,
+          background: meta.bg,
+        }}
+      >
+        View all {meta.label.toLowerCase()} events
+        <ArrowRight className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function ClusterPill({
   cluster,
   hovered,
@@ -1350,18 +1564,58 @@ function ClusterPill({
   const Icon = categoryIcon(cluster.category);
   const left = xScale(cluster.date);
   const sorted = [...cluster.events].sort((a, b) => a.date - b.date);
+  const narrow = isOpen && isNarrowScreen();
+
+  useEffect(() => {
+    if (!narrow) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [narrow]);
+
+  const panel = (
+    <ClusterPanel cluster={cluster} sorted={sorted} onClose={onClose} />
+  );
 
   return (
     <div
       className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
       style={{ left }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      onPointerEnter={(e) => {
+        if (e.pointerType !== "touch") onMouseEnter();
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType !== "touch") onMouseLeave();
+      }}
     >
+      {narrow &&
+        createPortal(
+          <div className="fixed inset-0 z-50">
+            <button
+              type="button"
+              aria-label="Dismiss events"
+              className="absolute inset-0 bg-slate-900/30"
+              onClick={onClose}
+            />
+            <div className="absolute inset-x-3 bottom-3 max-h-[min(70vh,32rem)] overflow-y-auto">
+              {panel}
+            </div>
+          </div>,
+          document.body,
+        )}
       <div className="relative">
         <button
-          onClick={onClick}
-          className="relative flex h-6 items-center rounded-full px-2.5 text-[11px] font-bold shadow-sm transition"
+          type="button"
+          onClick={(e) => {
+            const native = e.nativeEvent;
+            if ("pointerType" in native && native.pointerType === "touch") {
+              e.stopPropagation();
+            }
+            onClick();
+          }}
+          className="relative flex h-11 min-w-11 items-center justify-center rounded-full px-3 text-xs font-bold shadow-sm transition lg:h-6 lg:min-w-0 lg:px-2.5 lg:text-[11px]"
           style={{
             background: meta.pillBg,
             color: meta.pillText,
@@ -1419,65 +1673,9 @@ function ClusterPill({
           </div>
         )}
 
-        {isOpen && (
-          <div className="absolute left-1/2 bottom-full z-20 mb-3 w-[300px] -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
-            <div className="mb-2.5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className="flex size-6 items-center justify-center rounded-md"
-                  style={{ background: meta.bg, color: meta.color }}
-                >
-                  <Icon className="size-3.5" />
-                </span>
-                <span className="text-[13px] font-semibold text-slate-900">
-                  {meta.label}
-                </span>
-                <span className="text-slate-300">·</span>
-                <span className="text-[12px] text-slate-500">
-                  {cluster.events.length} events
-                </span>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose();
-                }}
-                className="rounded p-0.5 text-slate-400 hover:bg-slate-100"
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
-            <ul className="flex flex-col gap-1.5 text-[12px]">
-              {sorted.map((e) => {
-                const { verb, subject } = parseEventTitle(e.title, e.pairKind);
-                return (
-                  <li key={e.key} className="flex items-center gap-2.5">
-                    <span
-                      className="size-1.5 shrink-0 rounded-full"
-                      style={{ background: meta.color }}
-                    />
-                    <span className="w-[78px] shrink-0 text-slate-500 tabular-nums">
-                      {formatDateShort(e.date)}
-                    </span>
-                    <span className="font-medium text-slate-800">
-                      {verb ? `${verb} ` : ""}
-                      {subject}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-            <button
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11.5px] font-medium transition hover:brightness-95"
-              style={{
-                color: meta.color,
-                borderColor: meta.border,
-                background: meta.bg,
-              }}
-            >
-              View all {meta.label.toLowerCase()} events
-              <ArrowRight className="size-3.5" />
-            </button>
+        {!narrow && isOpen && (
+          <div className="absolute left-1/2 bottom-full z-20 mb-3 w-[300px] -translate-x-1/2">
+            {panel}
           </div>
         )}
       </div>
