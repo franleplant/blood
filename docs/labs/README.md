@@ -57,10 +57,14 @@ Conventions enforced by `INGEST_PROMPT.md`:
 
 - `date` is ISO `YYYY-MM-DD` (matches what `new Date(...)` parses elsewhere).
 - `value` and `unit` are stored **as written on the report** — `<5`, `1,23`, `mU/ml`, etc. are all fine. Normalization happens at read time in `src/lib/normalize_units.ts`, not at import.
-- `marker_name_en` should reuse names already in the DB whenever the marker matches an existing one (e.g. `Glucose`, `Insulin`, `AST`, `ALT`, `GGT`, `Total Testosterone`, `Estradiol`, `TSH`, `HDL Cholesterol`, `Triglycerides`, `Uric Acid`). The dashboard charts filter on these strings — drift breaks them silently.
+- `marker_name_en` should reuse names already in the DB whenever the marker matches an existing one (e.g. `Glucose`, `Basal Insulin`, `AST`, `ALT`, `GGT`, `Total Testosterone`, `Estradiol (E2)`, `TSH`, `HDL Cholesterol`, `Triglycerides`, `Uricemia`). The dashboard charts filter on these strings — drift breaks them silently.
 - `marker_name_es` is the original Spanish name from the report (or empty if the source is English-only).
 - The `id` column can be left blank in `extracted/<stem>.csv`; the workflow runs `add-ids-to-csv.ts` to backfill UUIDs before import.
 
 ## Pre-existing data
 
 The two CSVs at the repo root (`historiclabdata.csv`, `historiclabdata_2025-10-28_from_pdfs.csv`) were imported before this workflow existed. They are recorded in `INGESTED.md` for completeness; don't re-import them.
+
+## Canonical English names
+
+`npm run db:canonicalize-markers` renames known aliases of the same analyte onto one `marker_name_en` (the name that already has the most rows). It updates the committed SQLite database and `docs/labs/extracted/*.csv`, and it is safe to run again. It does not edit the root historic CSVs. Those files keep the spellings they were imported with; importing them again after a rename would insert the old names as new rows, because the safe importer dedupes on `(date, marker_name_en, value, user_id)`. Spanish names are left as printed. The map and the cases left unmerged live in `src/scripts/canonicalize-marker-names.ts`.

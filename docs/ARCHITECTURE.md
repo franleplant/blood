@@ -88,7 +88,7 @@ A few charts are non-trivial:
 
 - **HomaIRChart** runs a raw SQL `JOIN` to pair same-day glucose and insulin readings, then computes `HOMA-IR = glucose(mg/dL) × insulin(µUI/mL) / 405`. Rows with mismatched insulin units are skipped with a warning rather than dropped silently.
 - **LiverEnzymesChart** fans out to AST, ALT, GGT and *transposes* into per-date rows so all three lines share one Recharts dataset.
-- **UricAcidChart** unions both English ("Uric Acid") and Spanish-derived ("Uricemia") marker names — a recurring concern given the bilingual CSV source.
+- **UricAcidChart** still queries both "Uric Acid" and "Uricemia". The committed database stores the whole series as `Uricemia` (`npm run db:canonicalize-markers`); the extra search term only covers a row the rename has not seen.
 
 ### MarkersTable
 
@@ -173,7 +173,7 @@ Project-specific conventions enforced by the Cursor rules — apply them when ed
 
 ## Cross-cutting concerns
 
-- **Bilingual marker names.** Lab data lands as Spanish-named markers translated to English (`marker_name_es`/`marker_name_en`). Queries match on the English column with `contains` filters; a few markers (uric acid / uricemia) need both branches.
+- **Bilingual marker names.** Lab data lands as Spanish-named markers translated to English (`marker_name_es`/`marker_name_en`). Queries match on the English column with `contains` filters. Aliases of the same analyte are collapsed by `src/scripts/canonicalize-marker-names.ts`; chart searches still include the old string where a missed alias would otherwise drop off the series (uric acid still matches `Uricemia` and `Uric Acid`).
 - **Unit drift.** Same marker arrives with different units across labs and years. Normalization is centralized in `normalize_units.ts` and applied per-chart at read time. Adding a new chart almost always means extending one of the `toX` helpers there.
 - **Date axis alignment.** The dashboard computes a single `dateRange` once and passes it to every chart so they share an x-axis — without it, charts with sparse data drew on different domains and looked misleading.
 - **Single-user assumption today, schema ready for multi-user.** Every table has `user_id`; only the dashboard's hardcoded `userId = 1` blocks multi-user UI.

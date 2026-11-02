@@ -1174,7 +1174,11 @@ async function buildDashboardData(userId: number): Promise<DashboardData> {
       ["Uric Acid", "Uricemia"],
       "mg/dL",
     ),
-    fetchSimpleMarker(userId, MARKER_SPECS.ast, "AST", "U/L"),
+    // "Fasting Glucose" and "Casts" contain "ast".
+    fetchSimpleMarker(userId, MARKER_SPECS.ast, "AST", "U/L", [
+      "fasting",
+      "cast",
+    ]),
     fetchSimpleMarker(userId, MARKER_SPECS.alt, "ALT", "U/L"),
     fetchSimpleMarker(
       userId,
