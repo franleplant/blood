@@ -1,0 +1,8 @@
+id,date,marker_name_es,marker_name_en,value,unit,reference_range,lab_name,doctor_protocol_notes,derived,comments,other
+01a3e111-1dd8-4a9a-94cb-171b9490cb73,2026-08-20,Hormona Folículo Estimulante (FSH),Follicle-Stimulating Hormone (FSH),3.08,mUI/mL,1.50-12.40,Diagnóstico Maipú,Dr. Aguirre,No,,
+64545742-7c0f-4b66-bf50-192bc8ff4943,2026-08-20,Hormona Luteinizante (LH),Luteinizing Hormone (LH),3.12,mUI/mL,1.70-8.60,Diagnóstico Maipú,Dr. Aguirre,No,,
+b5525716-3c50-4943-b732-f18b53b938f6,2026-08-20,Estradiol (E2),Estradiol (E2),25.0,pg/mL,<42.6,Diagnóstico Maipú,Dr. Aguirre,No,,
+be02a06f-0e79-4b2c-a6a8-1c780c694448,2026-08-20,Testosterona en suero,Total Testosterone,5.36,ng/mL,2.18-9.06,Diagnóstico Maipú,Dr. Aguirre,No,,
+422f162a-b155-42d3-bc99-ccd69ace5f4d,2026-08-20,Testosterona Libre,Free Testosterone,411.87,pmol/L,198-619,Diagnóstico Maipú,Dr. Aguirre,Yes,Hombres 20-49 años,
+01383def-1c90-49f6-a30a-51e2a900cf1b,2026-08-20,Testosterona Biodisponible,Bioavailable Testosterone,2.86,ng/mL,1.25-4.11,Diagnóstico Maipú,Dr. Aguirre,Yes,,
+7334e07a-6890-4ccd-8449-053e7e5bfa22,2026-08-20,Cortisol en sangre,Cortisol,16.9,µg/dL,6.2-19.4,Diagnóstico Maipú,Dr. Aguirre,No,Matutino,

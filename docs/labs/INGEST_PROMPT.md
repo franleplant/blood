@@ -49,7 +49,7 @@ Rules:
   - **`Basal Insulin`** or any name containing `Insulin` (HOMA-IR pairs glucose+insulin on same date)
   - `Hemoglobin Glycated` / variants containing `Glycated` (HbA1c)
   - `Triglycerides`, `HDL Cholesterol` (Trig/HDL ratio chart)
-  - `Uric Acid` or `Uricemia`
+  - **`Uricemia`** (uric acid; do not also use `Uric Acid`)
   - `AST`, `ALT`, `GGT` (or `Gamma-Glutamyltransferase (GGT)`)
   - `Total Testosterone`, `Estradiol` (or `Estradiol (E2)`), `TSH`
 
