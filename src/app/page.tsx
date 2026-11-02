@@ -1158,7 +1158,10 @@ async function buildDashboardData(userId: number): Promise<DashboardData> {
       "ratio",
     ]),
     fetchTrigHdlRatio(userId),
-    fetchSimpleMarker(userId, MARKER_SPECS.creatinine, "Creatinine", "mg/dL"),
+    // Urine creatinine (2024-12-02, 114.3 mg/dL) contains "Creatinine".
+    fetchSimpleMarker(userId, MARKER_SPECS.creatinine, "Creatinine", "mg/dL", [
+      "urine",
+    ]),
     fetchSimpleMarker(
       userId,
       MARKER_SPECS.urea,
@@ -1171,7 +1174,11 @@ async function buildDashboardData(userId: number): Promise<DashboardData> {
       ["Uric Acid", "Uricemia"],
       "mg/dL",
     ),
-    fetchSimpleMarker(userId, MARKER_SPECS.ast, "AST", "U/L"),
+    // "Fasting Glucose" and "Casts" contain "ast".
+    fetchSimpleMarker(userId, MARKER_SPECS.ast, "AST", "U/L", [
+      "fasting",
+      "cast",
+    ]),
     fetchSimpleMarker(userId, MARKER_SPECS.alt, "ALT", "U/L"),
     fetchSimpleMarker(
       userId,
