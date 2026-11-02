@@ -67,6 +67,9 @@ export function DataTable<TData, TValue>({
 
   const totalRows = table.getFilteredRowModel().rows.length;
   const rows = table.getRowModel().rows;
+  // null until mounted so the server and the first client render match.
+  // After that, only the cards or only the table is in the document.
+  const mdUp = useMdUp();
 
   return (
     <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -125,17 +128,9 @@ export function DataTable<TData, TValue>({
         })}
       </div>
 
-      <ul className="flex flex-col divide-y divide-slate-100 md:hidden">
-        {rows.length ? (
-          rows.map((row) => <MarkerCard key={row.id} row={row} />)
-        ) : (
-          <li className="px-3 py-10 text-center text-sm text-slate-500">
-            No results.
-          </li>
-        )}
-      </ul>
-
-      <div className="hidden md:block">
+      {mdUp === null ? (
+        <div className="h-24" />
+      ) : mdUp ? (
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
           {table.getHeaderGroups().map((headerGroup) => (
@@ -192,61 +187,79 @@ export function DataTable<TData, TValue>({
           )}
         </TableBody>
       </Table>
-      </div>
+      ) : (
+        <ul className="flex flex-col divide-y divide-slate-100">
+          {rows.length ? (
+            rows.map((row) => <MarkerCard key={row.id} row={row} />)
+          ) : (
+            <li className="px-3 py-10 text-center text-sm text-slate-500">
+              No results.
+            </li>
+          )}
+        </ul>
+      )}
     </section>
   );
 }
 
-function asText(value: unknown): string {
-  if (value == null) return "";
-  return String(value);
+function useMdUp(): boolean | null {
+  const [mdUp, setMdUp] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const update = () => setMdUp(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return mdUp;
 }
 
-function formatRowDate(raw: string): string {
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+function renderCell<TData>(row: Row<TData>, id: string): React.ReactNode {
+  const cell = row.getVisibleCells().find((item) => item.column.id === id);
+  if (!cell) return null;
+  return flexRender(cell.column.columnDef.cell, cell.getContext());
 }
 
 // Phone layout: one lab result per card so the value sits next to the name.
-// A wide table would hide the value behind a horizontal scroll, and a sticky
-// first column still splits the record. From md up, the table is unchanged.
+// Formatting comes from the column definitions so the card and the table
+// can't drift. From md up, only the table is mounted.
 function MarkerCard<TData>({ row }: { row: Row<TData> }) {
-  const name = asText(row.getValue("marker_name_en"));
-  const es = asText(row.getValue("marker_name_es"));
-  const value = asText(row.getValue("value"));
-  const unit = asText(row.getValue("unit"));
-  const reference = asText(row.getValue("reference_range"));
-  const lab = asText(row.getValue("lab_name"));
-  const date = formatRowDate(asText(row.getValue("date")));
+  const name = row.getValue("marker_name_en");
+  const es = row.getValue("marker_name_es");
+  const showEs =
+    es != null && String(es) !== "" && String(es) !== String(name ?? "");
+  const reference = row.getValue("reference_range");
+  const lab = row.getValue("lab_name");
 
   return (
     <li className="px-3 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-medium leading-snug text-slate-900">
-            {name}
+            {renderCell(row, "marker_name_en")}
           </div>
-          {es && es !== name ? (
-            <div className="mt-0.5 text-xs leading-snug text-slate-500">{es}</div>
+          {showEs ? (
+            <div className="mt-0.5 text-xs leading-snug text-slate-500">
+              {renderCell(row, "marker_name_es")}
+            </div>
           ) : null}
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-sm font-semibold tabular-nums text-slate-900">
-            {value}
-          </div>
-          {unit ? <div className="text-xs text-slate-500">{unit}</div> : null}
+          {renderCell(row, "value")}
+          <div className="text-xs text-slate-500">{renderCell(row, "unit")}</div>
         </div>
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
-        <span className="tabular-nums text-slate-600">{date}</span>
-        {reference ? <span className="tabular-nums">Ref {reference}</span> : null}
-        {lab ? <span className="break-words">{lab}</span> : null}
+      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-slate-500">
+        {renderCell(row, "date")}
+        {reference ? (
+          <span className="inline-flex items-baseline gap-1">
+            <span>Ref</span>
+            {renderCell(row, "reference_range")}
+          </span>
+        ) : null}
+        {lab ? (
+          <span className="break-words">{renderCell(row, "lab_name")}</span>
+        ) : null}
       </div>
     </li>
   );

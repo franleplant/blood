@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  ArrowRight,
   Atom,
   Ban,
   ChevronDown,
@@ -29,7 +28,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   buildMonthTicks,
@@ -598,8 +597,8 @@ function Header({
   markerCount: number;
 }) {
   return (
-    <div className="flex flex-col gap-2.5 border-b border-slate-200 px-3 py-3 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:px-5">
-      <div className="hidden items-center gap-3 lg:flex">
+    <div className="flex flex-col gap-2.5 border-b border-slate-200 px-3 py-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-start lg:gap-x-3 lg:gap-y-2 lg:px-5 xl:justify-between">
+      <div className="hidden shrink-0 items-center gap-3 lg:flex">
         {!sidebarOpen && (
           <button
             onClick={onShowSidebar}
@@ -621,7 +620,7 @@ function Header({
         </button>
       </div>
 
-      <div className="flex w-full items-stretch gap-1 overflow-x-auto rounded-lg bg-slate-100 p-0.5 lg:w-auto lg:items-center">
+      <div className="flex w-full shrink-0 items-stretch gap-1 overflow-x-auto rounded-lg bg-slate-100 p-0.5 lg:w-auto lg:items-center lg:overflow-visible">
         {TIME_RANGES.map((r) => (
           <button
             key={r}
@@ -639,7 +638,7 @@ function Header({
         ))}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           aria-pressed={compareOn}
@@ -852,7 +851,7 @@ function MarkerRow({
   isLast: boolean;
 }) {
   const { xScale, width } = useTimeline();
-  const optimal = marker.rangeRows.find((row) => row.tone === "optimal");
+  const optimalRows = marker.rangeRows.filter((row) => row.tone === "optimal");
   return (
     <div className="dash-grid items-stretch max-lg:mb-3">
       <div className="flex items-start justify-between gap-3 py-2.5 lg:contents">
@@ -863,9 +862,11 @@ function MarkerRow({
           <div className="text-[11px] text-slate-500">
             {marker.derived ? "(derived)" : marker.unit}
           </div>
-          {optimal && (
-            <div className="mt-0.5 text-[11px] font-medium text-emerald-600 lg:hidden">
-              Optimal {optimal.text}
+          {optimalRows.length > 0 && (
+            <div className="mt-0.5 text-[11px] font-medium leading-snug text-emerald-600 lg:hidden">
+              {optimalRows.map((row) => (
+                <div key={row.text}>Optimal {row.text}</div>
+              ))}
             </div>
           )}
         </div>
@@ -1275,11 +1276,11 @@ function EventLane({
                     hoveredEvent?.eventKey === ev.key ||
                     (activePair?.some((p) => p.key === ev.key) ?? false)
                   }
-                  onMouseEnter={() =>
+                  onHover={() =>
                     setHoveredEvent({ eventKey: ev.key, pairId: ev.pairId })
                   }
-                  onMouseLeave={() => setHoveredEvent(null)}
-                  onTouchToggle={() =>
+                  onLeave={() => setHoveredEvent(null)}
+                  onToggle={() =>
                     setHoveredEvent(
                       hoveredEvent?.eventKey === ev.key
                         ? null
@@ -1348,20 +1349,34 @@ function EventLane({
 // (not its left edge) lands on the event's date.
 const EVENT_ICON_HALF_PX = 12;
 
+function eventAccessibleName(event: EventItem): string {
+  const { verb, subject } = parseEventTitle(event.title, event.pairKind);
+  const name = `${verb ? `${verb} ` : ""}${subject}`.trim();
+  if (event.pairId && event.endDate) {
+    const start = event.date < event.endDate ? event.date : event.endDate;
+    const end = event.date < event.endDate ? event.endDate : event.date;
+    return `${name}, ${formatDateTiny(start)} to ${formatDateTiny(end)}`;
+  }
+  if (event.pairId) {
+    return `${name}, started ${formatDateTiny(event.date)}`;
+  }
+  return `${name}, ${formatDateTiny(event.date)}`;
+}
+
 function EventMarker({
   event,
   hideLabel,
   highlighted,
-  onMouseEnter,
-  onMouseLeave,
-  onTouchToggle,
+  onHover,
+  onLeave,
+  onToggle,
 }: {
   event: EventItem;
   hideLabel: boolean;
   highlighted: boolean;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-  onTouchToggle: () => void;
+  onHover: () => void;
+  onLeave: () => void;
+  onToggle: () => void;
 }) {
   const { xScale, width } = useTimeline();
   const meta = CATEGORY_META[event.category];
@@ -1369,26 +1384,55 @@ function EventMarker({
     event.pairKind === "stop" ? Ban : categoryIcon(event.category);
   const left = xScale(event.date);
   const { verb, subject } = parseEventTitle(event.title, event.pairKind);
-  const alignRight = width > 0 && width < 640 && left > width * 0.55;
+  const alignRight = width > 0 && width < 1024 && left > width * 0.62;
+  const pointerKind = useRef("");
+  // Below lg the printed title is display:none, so the tooltip is the only
+  // name. On lg+, keep the old rule: a tooltip only when the title is hidden
+  // or this marker is one half of a pair.
+  const desktopTooltip = Boolean(event.pairId || hideLabel);
 
   return (
-    <div
-      className="absolute top-1/2 flex items-center gap-2 max-lg:-m-2.5 max-lg:p-2.5"
+    <button
+      type="button"
+      aria-expanded={highlighted}
+      aria-label={eventAccessibleName(event)}
+      className="absolute top-1/2 flex items-center gap-2 border-0 bg-transparent p-0 text-left max-lg:-m-2.5 max-lg:p-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
       style={{
         left: left - EVENT_ICON_HALF_PX,
         transform: "translateY(-50%)",
       }}
+      onPointerDown={(e) => {
+        pointerKind.current = e.pointerType;
+      }}
       onPointerEnter={(e) => {
-        if (e.pointerType !== "touch") onMouseEnter();
+        if (e.pointerType !== "touch") onHover();
       }}
       onPointerLeave={(e) => {
-        if (e.pointerType !== "touch") onMouseLeave();
+        if (e.pointerType === "touch") return;
+        // A tap focuses the button; a synthetic mouse leave after that
+        // must not dismiss the tooltip while it stays focused.
+        if (e.currentTarget === document.activeElement) return;
+        onLeave();
+      }}
+      onFocus={() => {
+        // Touch uses the click toggle. Focusing on pointerdown would turn the
+        // tooltip on and the following click would immediately toggle it off.
+        if (pointerKind.current === "touch") return;
+        onHover();
+      }}
+      onBlur={onLeave}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.stopPropagation();
+        onHover();
       }}
       onClick={(e) => {
-        const native = e.nativeEvent;
-        if (!("pointerType" in native) || native.pointerType !== "touch") return;
         e.stopPropagation();
-        onTouchToggle();
+        const kind = pointerKind.current;
+        pointerKind.current = "";
+        if (kind !== "touch") return;
+        e.currentTarget.focus();
+        onToggle();
       }}
     >
       <span
@@ -1415,11 +1459,11 @@ function EventMarker({
         </div>
       )}
 
-      {highlighted && (event.pairId || hideLabel) && (
+      {highlighted && (
         <div
-          className={`pointer-events-none absolute bottom-full z-20 mb-2 whitespace-nowrap max-lg:max-w-[min(16rem,calc(100vw-1.5rem))] max-lg:whitespace-normal ${
-            alignRight ? "right-0" : "left-0"
-          }`}
+          className={`pointer-events-none absolute bottom-full z-20 mb-2 w-max max-w-[min(16rem,calc(100vw-1.5rem))] whitespace-normal ${
+            desktopTooltip ? "" : "lg:hidden"
+          } ${alignRight ? "right-0" : "left-0"}`}
         >
           {event.pairId ? (
             <PairTooltip event={event} />
@@ -1427,11 +1471,15 @@ function EventMarker({
             <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 shadow-md">
               {verb ? `${verb} ` : ""}
               {subject}
+              <span className="font-normal text-slate-500">
+                {" "}
+                · {formatDateTiny(event.date)}
+              </span>
             </div>
           )}
         </div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -1458,19 +1506,119 @@ function PairTooltip({ event }: { event: EventItem }) {
 
 /* -------------------------- Cluster pill -------------------------- */
 
-function isNarrowScreen(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(max-width: 1023px)").matches;
+function useNarrowScreen(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1023px)");
+    const update = () => setNarrow(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return narrow;
+}
+
+const CLUSTER_FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function ClusterSheet({
+  titleId,
+  onClose,
+  children,
+}: {
+  titleId: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const inerted: Array<HTMLElement> = [];
+    for (const child of Array.from(document.body.children)) {
+      if (!(child instanceof HTMLElement)) continue;
+      if (dialog && child.contains(dialog)) continue;
+      if (child.hasAttribute("inert")) continue;
+      child.setAttribute("inert", "");
+      inerted.push(child);
+    }
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog?.focus({ preventScroll: true });
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+      const items = Array.from(
+        dialog.querySelectorAll<HTMLElement>(CLUSTER_FOCUSABLE),
+      ).filter((el) => el.tabIndex !== -1);
+      if (items.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === dialog)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+      for (const el of inerted) el.removeAttribute("inert");
+      previouslyFocused?.focus({ preventScroll: true });
+    };
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0 bg-slate-900/30"
+        onClick={() => onCloseRef.current()}
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="absolute inset-x-3 bottom-3 max-h-[min(70vh,32rem)] overflow-y-auto outline-none"
+      >
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 function ClusterPanel({
   cluster,
   sorted,
   onClose,
+  titleId,
 }: {
   cluster: Cluster;
   sorted: Array<EventItem>;
   onClose: () => void;
+  titleId: string;
 }) {
   const meta = CATEGORY_META[cluster.category];
   const Icon = categoryIcon(cluster.category);
@@ -1484,7 +1632,10 @@ function ClusterPanel({
           >
             <Icon className="size-3.5" />
           </span>
-          <span className="truncate text-[13px] font-semibold text-slate-900">
+          <span
+            id={titleId}
+            className="truncate text-[13px] font-semibold text-slate-900"
+          >
             {meta.label}
           </span>
           <span className="text-slate-300">·</span>
@@ -1524,18 +1675,6 @@ function ClusterPanel({
           );
         })}
       </ul>
-      <button
-        type="button"
-        className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11.5px] font-medium transition hover:brightness-95 lg:min-h-0"
-        style={{
-          color: meta.color,
-          borderColor: meta.border,
-          background: meta.bg,
-        }}
-      >
-        View all {meta.label.toLowerCase()} events
-        <ArrowRight className="size-3.5" />
-      </button>
     </div>
   );
 }
@@ -1564,19 +1703,17 @@ function ClusterPill({
   const Icon = categoryIcon(cluster.category);
   const left = xScale(cluster.date);
   const sorted = [...cluster.events].sort((a, b) => a.date - b.date);
-  const narrow = isOpen && isNarrowScreen();
-
-  useEffect(() => {
-    if (!narrow) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [narrow]);
+  const narrowScreen = useNarrowScreen();
+  const narrow = isOpen && narrowScreen;
+  const titleId = useId();
 
   const panel = (
-    <ClusterPanel cluster={cluster} sorted={sorted} onClose={onClose} />
+    <ClusterPanel
+      cluster={cluster}
+      sorted={sorted}
+      onClose={onClose}
+      titleId={titleId}
+    />
   );
 
   return (
@@ -1590,29 +1727,15 @@ function ClusterPill({
         if (e.pointerType !== "touch") onMouseLeave();
       }}
     >
-      {narrow &&
-        createPortal(
-          <div className="fixed inset-0 z-50">
-            <button
-              type="button"
-              aria-label="Dismiss events"
-              className="absolute inset-0 bg-slate-900/30"
-              onClick={onClose}
-            />
-            <div className="absolute inset-x-3 bottom-3 max-h-[min(70vh,32rem)] overflow-y-auto">
-              {panel}
-            </div>
-          </div>,
-          document.body,
-        )}
+      {narrow && <ClusterSheet titleId={titleId} onClose={onClose}>{panel}</ClusterSheet>}
       <div className="relative">
         <button
           type="button"
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          aria-label={`${cluster.events.length} ${meta.label} events`}
           onClick={(e) => {
-            const native = e.nativeEvent;
-            if ("pointerType" in native && native.pointerType === "touch") {
-              e.stopPropagation();
-            }
+            e.stopPropagation();
             onClick();
           }}
           className="relative flex h-11 min-w-11 items-center justify-center rounded-full px-3 text-xs font-bold shadow-sm transition lg:h-6 lg:min-w-0 lg:px-2.5 lg:text-[11px]"

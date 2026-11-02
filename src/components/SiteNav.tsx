@@ -16,7 +16,7 @@ export function SiteNav() {
       <div className="flex items-center gap-2 px-3 py-1.5 lg:gap-6 lg:px-5 lg:py-3">
         <Link
           href="/"
-          className="min-w-0 truncate font-semibold tracking-tight text-slate-900"
+          className="inline-flex min-h-11 min-w-0 items-center truncate font-semibold tracking-tight text-slate-900 lg:min-h-0"
         >
           Blood Markers
         </Link>
